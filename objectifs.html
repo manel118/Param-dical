@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Objectifs de soins</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { display: flex; background-color: #f3f4f6; height: 100vh; }
+
+    .sidebar {
+      width: 250px;
+      background-color: #1e2a38;
+      color: white;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+    .sidebar h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar ul li {
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #2a3b4c;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .sidebar ul li:hover { background-color: #3d5a73; }
+
+    .main {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .menu-toggle {
+      font-size: 28px;
+      cursor: pointer;
+      color: #3d5a73;
+      margin-right: 1rem;
+    }
+    .user-box {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+    .user-box i {
+      font-size: 32px;
+      margin-right: 8px;
+      color: #3d5a73;
+    }
+    .logout-menu {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: none;
+    }
+    .user-box:hover .logout-menu { display: block; }
+
+    h1 { color: #1e2a38; margin-bottom: 1rem; }
+
+    .diagnostic-block {
+      background: white;
+      border: 2px solid #cfd8dc;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .diagnostic-block h2 { color: #1e2a38; margin-bottom: 1rem; }
+
+    .goals {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .goal-card {
+      flex: 1 1 30%;
+      background-color: #f1f5f9;
+      border-radius: 10px;
+      border: 1px solid #dbeafe;
+      padding: 1rem;
+      font-size: 1.05rem;
+    }
+    .goal-card h3 { color: #1e2a38; margin-bottom: 0.5rem; }
+    .goal-card textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px;
+      background: white;
+      resize: vertical;
+      font-size: 1rem;
+    }
+
+    .btn-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2rem;
+    }
+    .btn-container button {
+      padding: 10px 20px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #3d5a73;
+      color: white;
+    }
+    .btn-container button:hover { background-color: #2a3b4c; }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <h2>Liste des patients</h2>
+    <ul id="patient-list"></ul>
+  </div>
+
+  <div class="main">
+    <div class="top-bar">
+      <span class="material-icons menu-toggle" onclick="toggleSidebar()">menu</span>
+      <h1>4. Définir les objectifs de soins</h1>
+      <div class="user-box">
+        <i class="material-icons">account_circle</i>
+        <span id="username"></span>
+        <div class="logout-menu" onclick="logout()">Se déconnecter</div>
+      </div>
+    </div>
+
+    <div id="objectifsContainer"></div>
+
+    <div class="btn-container">
+      <button onclick="enregistrerObjectifs()">Enregistrer</button>
+      <button onclick="validerObjectifs()">Continuer</button>
+    </div>
+  </div>
+
+  <script>
+    const objectifsPredefinis = {
+// --- Besoin 1 : Respirer
+  "Dégagement inefficace des voies respiratoires": {
+    "court": "Le patient éliminera les sécrétions efficacement après chaque séance de kinésithérapie respiratoire.",
+    "moyen": "Le patient maintiendra des bruits respiratoires clairs dans les 3 jours.",
+    "long": "Le patient conservera une saturation en O2 > 95 % pendant 7 jours consécutifs sans détresse respiratoire."
+  },
+  "Incapacité de maintenir une respiration spontanée": {
+    "court": "Le patient utilisera correctement l’assistance respiratoire dans les 12 heures.",
+    "moyen": "Le patient initiera des respirations spontanées dans les 3 jours.",
+    "long": "Le patient respirera de manière autonome sans assistance pendant 24 heures."
+  },
+  "Intolérance au sevrage de la ventilation assistée": {
+    "court": "Le patient tolérera une première séance de sevrage de 30 minutes sans signes de détresse.",
+    "moyen": "Le patient augmentera progressivement la durée des périodes sans assistance ventilatoire.",
+    "long": "Le patient sera totalement sevré de la ventilation assistée dans les 5 jours."
+  },
+  "Mode de respiration inefficace": {
+    "court": "Le patient adoptera une respiration diaphragmatique au repos.",
+    "moyen": "Le patient contrôlera efficacement son rythme respiratoire en situation de stress.",
+    "long": "Le patient maintiendra une fréquence respiratoire stable et adaptée à ses activités."
+  },
+  "Perturbation des échanges gazeux": {
+    "court": "Le patient recevra une oxygénothérapie adaptée dans les 2 heures.",
+    "moyen": "Le patient présentera des gaz du sang normaux dans les 48 heures.",
+    "long": "Le patient maintiendra des échanges gazeux efficaces sans assistance dans les 5 jours.",
+  },
+  "Risque élevé de suffocation (manque d'air)": {
+    "court": "Le patient sera positionné de manière sécurisée pour éviter l’aspiration.",
+    "moyen": "Le patient ne présentera aucun signe de fausse route pendant les repas pendant 3 jours.",
+    "long": "Le patient maintiendra une déglutition efficace et sécurisée dans la semaine."
+  },
+  "Risque de fausse route (ou risque d'inhalation ou d'aspiration)": {
+    "court": "Le patient sera nourri uniquement en position assise à 90°.",
+    "moyen": "Le patient avalera sans signes de toux ou de voix humide pendant les repas.",
+    "long": "Le patient ne présentera aucun signe d’aspiration durant les 7 prochains jours."
+  },
+  "Risque d'intoxication": {
+    "court": "Le patient saura identifier les produits/toxines à éviter dans son environnement.",
+    "moyen": "Le patient évitera les expositions toxiques grâce aux précautions enseignées.",
+    "long": "Aucun signe d’intoxication ne sera observé jusqu'à la fin de l’hospitalisation."
+  },
+
+// --- Besoin 2 : Boire et manger
+  "Déficit de soins personnels: s'alimenter": {
+    "court": "Le patient prendra un repas équilibré sous supervision dans les 24 heures.",
+    "moyen": "Le patient sera capable de manger seul après 3 jours d’assistance.",
+    "long": "Le patient adoptera une alimentation autonome et équilibrée sur une semaine."
+  },
+  "Alimentation déficiente": {
+    "court": "Le patient recevra des repas adaptés à ses besoins nutritionnels dans les 24 heures.",
+    "moyen": "Le patient améliorera sa prise alimentaire et son poids au bout de 3 jours.",
+    "long": "Le patient maintiendra une alimentation équilibrée et atteindra son poids cible en 7 jours."
+  },
+  "Alimentation excessive": {
+    "court": "Le patient recevra des conseils sur la gestion de la prise alimentaire dans les 24 heures.",
+    "moyen": "Le patient commencera à réduire la prise alimentaire excessive dans les 3 jours.",
+    "long": "Le patient maintiendra un poids corporel stable et une alimentation modérée après 7 jours."
+  },
+  "Risque d'alimentation excessive": {
+    "court": "Le patient suivra une alimentation équilibrée sous supervision dans les 24 heures.",
+    "moyen": "Le patient réduira les prises alimentaires excessives sur 3 jours.",
+    "long": "Le patient maintiendra une prise alimentaire régulière et modérée sur 7 jours."
+  },
+  "Motivation à améliorer son alimentation": {
+    "court": "Le patient exprimera une volonté d’améliorer son alimentation dans les 24 heures.",
+    "moyen": "Le patient mettra en place des changements alimentaires avec aide dans les 3 jours.",
+    "long": "Le patient adoptera des habitudes alimentaires plus saines de manière autonome dans les 7 jours."
+  },
+  "Denture altérée": {
+    "court": "Le patient sera évalué pour des prothèses dentaires adaptées dans les 48 heures.",
+    "moyen": "Le patient utilisera ses prothèses dentaires pour manger efficacement dans les 3 jours.",
+    "long": "Le patient conservera une dentition fonctionnelle et propre à long terme."
+  },
+  "Nausées": {
+    "court": "Le patient recevra des médicaments anti-nauséeux dans les 24 heures.",
+    "moyen": "Les nausées du patient seront contrôlées et disparaitront dans les 3 jours.",
+    "long": "Le patient sera exempt de nausées persistantes durant une semaine."
+  },
+  "Trouble de la déglutition": {
+    "court": "Le patient sera évalué pour un plan de soins adaptés à la déglutition dans les 24 heures.",
+    "moyen": "Le patient commencera une rééducation de la déglutition dans les 3 jours.",
+    "long": "Le patient maîtrisera la déglutition sans risques de fausse route dans 7 jours."
+  },
+  "Déficit de volume liquidien (déshydratation)": {
+    "court": "Le patient recevra une réhydratation adaptée dans les 12 heures.",
+    "moyen": "Le patient aura un retour à l’hydratation normale dans les 3 jours.",
+    "long": "Le patient maintiendra une hydratation stable et équilibrée durant la semaine."
+  },
+  "Risque de déficit de volume liquidien (déshydratation)": {
+    "court": "Le patient sera informé et suivra un plan de réhydratation préventive dans les 24 heures.",
+    "moyen": "Le patient commencera à maintenir une prise liquide régulière dans les 3 jours.",
+    "long": "Le patient sera bien hydraté et n’aura aucun signe de déshydratation après 7 jours."
+  },
+  "Risque de déséquilibre du volume liquidien": {
+    "court": "Le patient sera suivi pour équilibrer ses apports en liquides dans les 24 heures.",
+    "moyen": "Le patient maintiendra un équilibre hydrique stable dans les 3 jours.",
+    "long": "Le patient conservera une hydratation optimale et équilibrée pendant une semaine."
+  },
+  "Excès de volume liquidien (œdème)": {
+    "court": "Le patient recevra un traitement pour réduire l'œdème dans les 24 heures.",
+    "moyen": "L'œdème du patient sera réduit significativement après 3 jours de traitement.",
+    "long": "Le patient maintiendra une circulation sanguine et une hydratation équilibrée sans œdème."
+  },
+  "Risque d'aspiration (fausse route)": {
+    "court": "Le patient sera positionné et alimenté de manière sécurisée dans les 24 heures.",
+    "moyen": "Le patient ne présentera aucun signe de fausse route lors des repas dans les 3 jours.",
+    "long": "Le patient maintiendra une déglutition sécurisée sans risques d’aspiration pendant une semaine."
+  },
+  "Motivation à améliorer son équilibre hydrique": {
+    "court": "Le patient exprime un désir d'améliorer son hydratation dans les 24 heures.",
+    "moyen": "Le patient suivra un plan d'équilibre hydrique avec une augmentation progressive des apports dans 3 jours.",
+    "long": "Le patient maintiendra une hydratation optimale et régulière de manière autonome sur 7 jours."
+  },
+  "Mode d'alimentation inefficace chez le nourrisson/nouveau-né": {
+    "court": "Le nourrisson sera alimenté de manière efficace avec assistance dans les 24 heures.",
+    "moyen": "Le nourrisson sera capable de s’alimenter de manière autonome dans les 3 jours.",
+    "long": "Le nourrisson maintiendra une alimentation autonome et régulière sans difficulté."
+  },
+  "Allaitement maternel efficace": {
+    "court": "Le nourrisson recevra un allaitement adéquat toutes les 2 heures.",
+    "moyen": "Le nourrisson sera capable de téter efficacement et régulièrement dans les 3 jours.",
+    "long": "Le nourrisson sera allaité exclusivement au sein et efficacement dans 7 jours."
+  },
+  "Allaitement maternel inefficace": {
+    "court": "Le nourrisson recevra un soutien pour améliorer l’allaitement dans les 24 heures.",
+    "moyen": "Le nourrisson commencera à téter efficacement après 3 jours de soutien.",
+    "long": "Le nourrisson sera allaité efficacement de manière régulière dans 7 jours."
+  },
+  "Allaitement maternel interrompu": {
+    "court": "Le nourrisson recevra des compléments alimentaires dans les 24 heures.",
+    "moyen": "L’allaitement maternel sera rétabli après 3 jours de soutien.",
+    "long": "Le nourrisson sera exclusivement allaité au sein à nouveau dans les 7 jours."
+  },
+
+// --- Besoin 3 : Éliminer
+  "Constipation": {
+    "court": "Le patient recevra un traitement pour soulager la constipation dans les 24 heures.",
+    "moyen": "Le patient commencera à avoir des selles régulières après 3 jours de traitement.",
+    "long": "Le patient maintiendra une régularité dans ses selles et une bonne hydratation durant 7 jours."
+  },
+  "Déficit de soins personnels: utiliser les toilettes": {
+    "court": "Le patient utilisera les toilettes de manière autonome après 24 heures d'assistance.",
+    "moyen": "Le patient sera capable de se rendre aux toilettes seul dans les 3 jours.",
+    "long": "Le patient maintiendra une autonomie totale dans l'utilisation des toilettes après 7 jours."
+  },
+  "Diarrhée": {
+    "court": "Le patient recevra un traitement pour contrôler la diarrhée dans les 24 heures.",
+    "moyen": "La diarrhée sera contrôlée et réduite après 3 jours de traitement.",
+    "long": "Le patient sera exempt de diarrhée persistante après 7 jours."
+  },
+  "Elimination urinaire altérée": {
+    "court": "Le patient recevra un traitement adapté pour corriger l’élimination urinaire dans les 24 heures.",
+    "moyen": "Le patient retrouvera un rythme urinaire normal après 3 jours de traitement.",
+    "long": "Le patient maintiendra une fonction urinaire normale sans complications sur 7 jours."
+  },
+  "Incontinence fécale": {
+    "court": "Le patient recevra des mesures pour contrôler l'incontinence fécale dans les 24 heures.",
+    "moyen": "L'incontinence fécale sera maîtrisée et contrôlée dans les 3 jours.",
+    "long": "Le patient maintiendra un contrôle total des selles dans 7 jours."
+  },
+  "Incontinence urinaire à l'effort": {
+    "court": "Le patient recevra des traitements pour réduire l'incontinence urinaire dans les 24 heures.",
+    "moyen": "Le patient verra une amélioration de l’incontinence urinaire à l’effort après 3 jours.",
+    "long": "Le patient n’aura plus d’incontinence urinaire à l’effort après 7 jours."
+  },
+  "Incontinence urinaire complète (ou vraie)": {
+    "court": "Le patient recevra des soins pour gérer l’incontinence urinaire complète dans les 24 heures.",
+    "moyen": "Le patient commencera à avoir un contrôle partiel sur l'incontinence après 3 jours.",
+    "long": "Le patient maintiendra un contrôle total de ses fonctions urinaires dans 7 jours."
+  },
+  "Incontinence urinaire fonctionnelle": {
+    "court": "Le patient recevra une aide fonctionnelle pour gérer l’incontinence urinaire dans les 24 heures.",
+    "moyen": "Le patient commencera à maîtriser l’incontinence fonctionnelle après 3 jours.",
+    "long": "Le patient maintiendra un contrôle fonctionnel sur ses besoins urinaires dans 7 jours."
+  },
+  "Incontinence urinaire par besoin impérieux": {
+    "court": "Le patient sera traité pour l'incontinence urinaire par besoin impérieux dans les 24 heures.",
+    "moyen": "Le patient verra une réduction des épisodes d’incontinence après 3 jours.",
+    "long": "Le patient sera capable de contrôler les urgences urinaires sans fuites après 7 jours."
+  },
+  "Incontinence urinaire réflexe": {
+    "court": "Le patient recevra des soins pour gérer l’incontinence urinaire réflexe dans les 24 heures.",
+    "moyen": "Le patient commencera à maîtriser l'incontinence réflexe après 3 jours de traitement.",
+    "long": "Le patient n'aura plus d’incontinence urinaire réflexe après 7 jours."
+  },
+  "Motivation à améliorer son élimination urinaire": {
+    "court": "Le patient exprimera un désir de contrôler son élimination urinaire dans les 24 heures.",
+    "moyen": "Le patient mettra en place des stratégies pour améliorer son élimination urinaire dans les 3 jours.",
+    "long": "Le patient sera capable de maintenir un contrôle de ses fonctions urinaires sur 7 jours."
+  },
+  "Pseudo-constipation": {
+    "court": "Le patient recevra des conseils pour gérer la pseudo-constipation dans les 24 heures.",
+    "moyen": "Le patient commencera à présenter une amélioration dans ses habitudes intestinales après 3 jours.",
+    "long": "Le patient retrouvera une régularité dans ses selles et évitera la pseudo-constipation après 7 jours."
+  },
+  "Rétention urinaire": {
+    "court": "Le patient recevra un traitement pour soulager la rétention urinaire dans les 24 heures.",
+    "moyen": "Le patient commencera à uriner de manière normale après 3 jours de traitement.",
+    "long": "Le patient maintiendra une fonction urinaire normale sans rétention après 7 jours."
+  },
+  "Risque d'incontinence urinaire par besoin impérieux": {
+    "court": "Le patient recevra un traitement préventif contre l'incontinence urinaire dans les 24 heures.",
+    "moyen": "Le patient commencera à maîtriser les symptômes d’incontinence par besoin impérieux dans 3 jours.",
+    "long": "Le patient évitera les fuites urinaires en cas de besoin impérieux après 7 jours."
+  },
+  "Risque de constipation": {
+    "court": "Le patient recevra des conseils pour prévenir la constipation dans les 24 heures.",
+    "moyen": "Le patient prendra des mesures pour éviter la constipation dans les 3 jours.",
+    "long": "Le patient maintiendra une fonction intestinale normale et préviendra la constipation sur 7 jours."
+  },
+// --- Besoin 4 : Se mouvoir et maintenir une bonne posture
+  "Capacité intracrânienne diminuée": {
+    "court": "Le patient recevra un traitement pour améliorer la capacité intracrânienne dans les 24 heures.",
+    "moyen": "Le patient montrera une amélioration de la capacité intracrânienne après 3 jours.",
+    "long": "Le patient maintiendra une fonction cérébrale normale après 7 jours."
+  },
+  "Champ énergétique perturbé": {
+    "court": "Le patient sera réévalué pour améliorer son énergie dans les 24 heures.",
+    "moyen": "Le patient commencera à améliorer son niveau d'énergie après 3 jours.",
+    "long": "Le patient maintiendra un niveau d'énergie stable et normal après 7 jours."
+  },
+  "Débit cardiaque diminué": {
+    "court": "Le patient recevra un traitement pour augmenter le débit cardiaque dans les 24 heures.",
+    "moyen": "Le débit cardiaque du patient se stabilisera après 3 jours.",
+    "long": "Le patient maintiendra un débit cardiaque optimal sans complications après 7 jours."
+  },
+  "Désorganisation comportementale chez le nouveau-né/nourrisson": {
+    "court": "Le nouveau-né sera réévalué pour améliorer ses comportements dans les 24 heures.",
+    "moyen": "Le nourrisson montrera une meilleure organisation comportementale après 3 jours.",
+    "long": "Le nourrisson maintiendra une organisation comportementale stable et appropriée après 7 jours."
+  },
+  "Difficulté à la marche": {
+    "court": "Le patient recevra des soins pour améliorer la marche dans les 24 heures.",
+    "moyen": "Le patient commencera à marcher sans difficulté après 3 jours.",
+    "long": "Le patient marchera de manière autonome et stable après 7 jours."
+  },
+  "Difficulté lors d'un transfert": {
+    "court": "Le patient recevra un soutien pour faciliter le transfert dans les 24 heures.",
+    "moyen": "Le patient commencera à transférer de manière plus autonome après 3 jours.",
+    "long": "Le patient sera capable de réaliser des transferts de manière autonome après 7 jours."
+  },
+  "Fatigue": {
+    "court": "Le patient recevra des traitements pour réduire la fatigue dans les 24 heures.",
+    "moyen": "La fatigue du patient sera considérablement réduite après 3 jours.",
+    "long": "Le patient maintiendra un niveau d'énergie stable et ne se sentira plus fatigué après 7 jours."
+  },
+  "Intolerance à l'activité": {
+    "court": "Le patient sera évalué pour réduire son intolérance à l'activité dans les 24 heures.",
+    "moyen": "Le patient commencera à tolérer de courtes périodes d'activité après 3 jours.",
+    "long": "Le patient sera capable de participer à des activités physiques normales après 7 jours."
+  },
+  "Irrigation tissulaire inefficace": {
+    "court": "Le patient recevra un traitement pour améliorer l'irrigation tissulaire dans les 24 heures.",
+    "moyen": "L'irrigation tissulaire du patient sera améliorée après 3 jours.",
+    "long": "Le patient maintiendra une irrigation tissulaire efficace après 7 jours."
+  },
+  "Mobilité physique réduite": {
+    "court": "Le patient recevra un traitement pour améliorer la mobilité physique dans les 24 heures.",
+    "moyen": "Le patient commencera à améliorer sa mobilité physique après 3 jours.",
+    "long": "Le patient maintiendra une mobilité physique normale après 7 jours."
+  },
+  "Mobilité réduite au lit": {
+    "court": "Le patient recevra un soutien pour améliorer sa mobilité au lit dans les 24 heures.",
+    "moyen": "Le patient commencera à bouger plus facilement dans son lit après 3 jours.",
+    "long": "Le patient sera capable de se déplacer de manière autonome au lit après 7 jours."
+  },
+  "Mobilité réduite en fauteuil roulant": {
+    "court": "Le patient recevra un soutien pour améliorer la mobilité en fauteuil roulant dans les 24 heures.",
+    "moyen": "Le patient commencera à se déplacer plus facilement en fauteuil roulant après 3 jours.",
+    "long": "Le patient sera capable de se déplacer en fauteuil roulant de manière autonome après 7 jours."
+  },
+  "Mode de vie sédentaire": {
+    "court": "Le patient recevra des conseils pour réduire la sédentarité dans les 24 heures.",
+    "moyen": "Le patient commencera à intégrer des activités physiques légères dans son quotidien après 3 jours.",
+    "long": "Le patient maintiendra un mode de vie actif et évitera la sédentarité après 7 jours."
+  },
+  "Réceptivité du nouveau-né/nourrisson à progresser dans son organisation comportementale": {
+    "court": "Le nourrisson recevra un soutien pour améliorer son organisation comportementale dans les 24 heures.",
+    "moyen": "Le nourrisson montrera des progrès dans son organisation comportementale après 3 jours.",
+    "long": "Le nourrisson atteindra une organisation comportementale stable et saine après 7 jours."
+  },
+  "Rétablissement post opératoire retardé": {
+    "court": "Le patient recevra des soins pour accélérer son rétablissement post-opératoire dans les 24 heures.",
+    "moyen": "Le patient commencera à se rétablir plus rapidement après 3 jours.",
+    "long": "Le patient atteindra un rétablissement complet après 7 jours."
+  },
+  "Retard de la croissance et du développement": {
+    "court": "Le patient recevra un suivi pour soutenir la croissance et le développement dans les 24 heures.",
+    "moyen": "Le patient montrera des progrès dans sa croissance et son développement après 3 jours.",
+    "long": "Le patient atteindra des étapes de croissance et de développement normales après 7 jours."
+  },
+  "Risque d'intolérance à l'activité": {
+    "court": "Le patient recevra des traitements pour prévenir l’intolérance à l’activité dans les 24 heures.",
+    "moyen": "Le patient commencera à tolérer les activités légères après 3 jours.",
+    "long": "Le patient participera à des activités physiques normales sans intolérance après 7 jours."
+  },
+  "Risque de croissance anormale": {
+    "court": "Le patient recevra un suivi pour prévenir la croissance anormale dans les 24 heures.",
+    "moyen": "Le patient montrera des progrès dans la croissance normale après 3 jours.",
+    "long": "Le patient maintiendra une croissance normale et adaptée après 7 jours."
+  },
+  "Risque de désorganisation comportementale chez le nouveau-né/nourrisson": {
+    "court": "Le nourrisson recevra des soins pour prévenir la désorganisation comportementale dans les 24 heures.",
+    "moyen": "Le nourrisson montrera des signes d'amélioration de son comportement après 3 jours.",
+    "long": "Le nourrisson maintiendra une organisation comportementale stable après 7 jours."
+  },
+  "Risque de dysfonctionnement neuro-vasculaire périphérique": {
+    "court": "Le patient recevra un traitement pour prévenir les dysfonctionnements neuro-vasculaires dans les 24 heures.",
+    "moyen": "Le patient commencera à présenter des signes d'amélioration après 3 jours.",
+    "long": "Le patient maintiendra une fonction neuro-vasculaire périphérique normale après 7 jours."
+  },
+  "Risque de retard de la croissance et du développement": {
+    "court": "Le patient recevra un suivi pour prévenir le retard de croissance et de développement dans les 24 heures.",
+    "moyen": "Le patient commencera à présenter une croissance et un développement normaux après 3 jours.",
+    "long": "Le patient atteindra une croissance et un développement appropriés après 7 jours."
+  },
+  "Risque de syndrome d'immobilité": {
+    "court": "Le patient recevra des soins pour prévenir le syndrome d'immobilité dans les 24 heures.",
+    "moyen": "Le patient commencera à se mobiliser davantage après 3 jours.",
+    "long": "Le patient évitera les complications liées à l'immobilité après 7 jours."
+  },
+  // --- Besoin 5 : Sommeil
+  "Fatigue": {
+    "court": "Le patient recevra un traitement pour réduire la fatigue dans les 24 heures.",
+    "moyen": "Le patient commencera à ressentir moins de fatigue après 3 jours.",
+    "long": "Le patient maintiendra un niveau d'énergie normal et constant après 7 jours."
+  },
+  "Habitudes de sommeil perturbées": {
+    "court": "Le patient recevra des conseils pour améliorer ses habitudes de sommeil dans les 24 heures.",
+    "moyen": "Le patient commencera à avoir des habitudes de sommeil plus régulières après 3 jours.",
+    "long": "Le patient maintiendra des habitudes de sommeil saines et régulières après 7 jours."
+  },
+  "Motivation à améliorer son sommeil": {
+    "court": "Le patient sera motivé à améliorer son sommeil dans les 24 heures.",
+    "moyen": "Le patient mettra en œuvre des stratégies pour améliorer son sommeil après 3 jours.",
+    "long": "Le patient maintiendra une bonne qualité de sommeil sur le long terme après 7 jours."
+  },
+  "Privation de sommeil": {
+    "court": "Le patient recevra un traitement pour éviter la privation de sommeil dans les 24 heures.",
+    "moyen": "Le patient commencera à avoir un sommeil de qualité après 3 jours.",
+    "long": "Le patient ne souffrira plus de privation de sommeil après 7 jours."
+  },
+
+  // --- Besoin 6 : S'habiller et se dévêtir
+  "Déficit de soins personnels: se vêtir/soigner son apparence": {
+    "court": "Le patient recevra des conseils pour améliorer ses soins personnels dans les 24 heures.",
+    "moyen": "Le patient commencera à adopter des habitudes de soins personnels plus efficaces après 3 jours.",
+    "long": "Le patient maintiendra une routine de soins personnels stable et efficace après 7 jours."
+  },
+
+  // --- Besoin 7 : Température corporelle
+  "Hyperthermie": {
+    "court": "Le patient recevra un traitement pour réduire la température corporelle dans les 24 heures.",
+    "moyen": "La température corporelle du patient se stabilisera après 3 jours.",
+    "long": "Le patient maintiendra une température corporelle normale après 7 jours."
+  },
+  "Hypothermie": {
+    "court": "Le patient recevra un traitement pour augmenter la température corporelle dans les 24 heures.",
+    "moyen": "La température corporelle du patient se stabilisera après 3 jours.",
+    "long": "Le patient maintiendra une température corporelle normale après 7 jours."
+  },
+  "Risque température corporelle anormale": {
+    "court": "Le patient recevra des soins pour prévenir toute variation anormale de la température corporelle dans les 24 heures.",
+    "moyen": "Le patient maintiendra une température corporelle stable après 3 jours.",
+    "long": "Le patient évitera les variations extrêmes de température corporelle après 7 jours."
+  },
+  "Thermorégulation inefficace": {
+    "court": "Le patient recevra un traitement pour améliorer la thermorégulation dans les 24 heures.",
+    "moyen": "Le patient commencera à réguler sa température corporelle plus efficacement après 3 jours.",
+    "long": "Le patient maintiendra une thermorégulation efficace et stable après 7 jours."
+  },
+
+  // --- Besoin 8 : Intégrité de la peau
+  "Atteinte à l'intégrité de la peau": {
+    "court": "Le patient recevra un soin pour améliorer l'intégrité de la peau dans les 24 heures.",
+    "moyen": "L'intégrité de la peau du patient sera rétablie après 3 jours.",
+    "long": "Le patient maintiendra une peau saine et intacte après 7 jours."
+  },
+  "Atteinte à l'intégrité des tissus": {
+    "court": "Le patient recevra un traitement pour restaurer l'intégrité des tissus dans les 24 heures.",
+    "moyen": "L'intégrité des tissus du patient sera rétablie après 3 jours.",
+    "long": "Le patient maintiendra une intégrité tissulaire stable après 7 jours."
+  },
+  "Atteinte de la muqueuse buccale": {
+    "court": "Le patient recevra un soin pour améliorer l'intégrité de la muqueuse buccale dans les 24 heures.",
+    "moyen": "La muqueuse buccale du patient se régénérera après 3 jours.",
+    "long": "Le patient maintiendra une muqueuse buccale saine et intacte après 7 jours."
+  },
+  "Déficit de soins personnels: se laver/effectuer les soins d'hygiène": {
+    "court": "Le patient recevra des conseils pour améliorer ses soins d'hygiène dans les 24 heures.",
+    "moyen": "Le patient commencera à suivre une routine d'hygiène personnelle plus rigoureuse après 3 jours.",
+    "long": "Le patient maintiendra une hygiène personnelle optimale après 7 jours."
+  },
+  "Denture altérée": {
+    "court": "Le patient recevra un traitement pour améliorer l'état de ses dents dans les 24 heures.",
+    "moyen": "L'état de la denture du patient s'améliorera après 3 jours.",
+    "long": "Le patient maintiendra une denture saine et intacte après 7 jours."
+  },
+  "Risque d'atteinte à l'intégrité de la peau": {
+    "court": "Le patient recevra des soins préventifs pour éviter toute atteinte à l'intégrité de la peau dans les 24 heures.",
+    "moyen": "Le patient montrera des signes d'amélioration de l'intégrité de la peau après 3 jours.",
+    "long": "Le patient évitera toute atteinte à l'intégrité de la peau après 7 jours."
+  },
+
+// --- Besoin 9 : Éviter les dangers
+  "Anxiété": {
+    "court": "Le patient recevra un traitement pour réduire son anxiété dans les 24 heures.",
+    "moyen": "Le patient commencera à ressentir moins d'anxiété après 3 jours.",
+    "long": "Le patient maintiendra une gestion efficace de son anxiété après 7 jours."
+  },
+  "Automutilation": {
+    "court": "Le patient recevra des soins pour prévenir l'automutilation dans les 24 heures.",
+    "moyen": "Le patient commencera à gérer l'automutilation de manière plus efficace après 3 jours.",
+    "long": "Le patient ne pratiquera plus d'automutilation après 7 jours."
+  },
+  "Chagrin chronique": {
+    "court": "Le patient recevra un soutien pour gérer le chagrin dans les 24 heures.",
+    "moyen": "Le patient commencera à surmonter son chagrin après 3 jours.",
+    "long": "Le patient aura appris à vivre avec son chagrin de manière saine après 7 jours."
+  },
+  "Déni non constructif": {
+    "court": "Le patient recevra des soins pour surmonter le déni non constructif dans les 24 heures.",
+    "moyen": "Le patient commencera à accepter la situation après 3 jours.",
+    "long": "Le patient aura surmonté le déni et abordera sa situation de manière réaliste après 7 jours."
+  },
+  "Deuil anticipé": {
+    "court": "Le patient recevra un soutien pour gérer le deuil anticipé dans les 24 heures.",
+    "moyen": "Le patient commencera à accepter le deuil anticipé après 3 jours.",
+    "long": "Le patient aura appris à gérer le deuil anticipé de manière saine après 7 jours."
+  },
+  "Deuil dysfonctionnel": {
+    "court": "Le patient recevra un soutien pour gérer un deuil dysfonctionnel dans les 24 heures.",
+    "moyen": "Le patient commencera à trouver un moyen efficace de surmonter le deuil après 3 jours.",
+    "long": "Le patient aura surmonté le deuil dysfonctionnel et s'adaptera à sa situation après 7 jours."
+  },
+  "Diminution chronique de l'estime de soi": {
+    "court": "Le patient recevra des soins pour améliorer son estime de soi dans les 24 heures.",
+    "moyen": "L'estime de soi du patient commencera à s'améliorer après 3 jours.",
+    "long": "Le patient maintiendra une estime de soi positive et stable après 7 jours."
+  },
+  "Diminution situationnelle de l'estime de soi": {
+    "court": "Le patient recevra un soutien pour améliorer son estime de soi dans les 24 heures.",
+    "moyen": "L'estime de soi du patient se stabilisera après 3 jours.",
+    "long": "Le patient maintiendra une estime de soi saine après 7 jours."
+  },
+  "Douleur aiguë": {
+    "court": "Le patient recevra un traitement pour soulager la douleur aiguë dans les 24 heures.",
+    "moyen": "La douleur aiguë du patient sera réduite après 3 jours.",
+    "long": "Le patient sera capable de gérer sa douleur de manière efficace après 7 jours."
+  },
+  "Douleur chronique": {
+    "court": "Le patient recevra un traitement pour gérer la douleur chronique dans les 24 heures.",
+    "moyen": "La douleur chronique du patient sera mieux gérée après 3 jours.",
+    "long": "Le patient aura appris à gérer sa douleur chronique de manière efficace après 7 jours."
+  },
+  "Dysréflexie autonome": {
+    "court": "Le patient recevra un traitement pour réduire les risques de dysréflexie autonome dans les 24 heures.",
+    "moyen": "Les symptômes de dysréflexie autonome du patient se stabiliseront après 3 jours.",
+    "long": "Le patient sera capable de gérer les épisodes de dysréflexie autonome après 7 jours."
+  },
+  "Entretien inefficace au domicile": {
+    "court": "Le patient recevra des conseils pour améliorer l'entretien au domicile dans les 24 heures.",
+    "moyen": "Le patient commencera à améliorer la gestion de son environnement domestique après 3 jours.",
+    "long": "Le patient maintiendra un environnement domestique bien entretenu et sain après 7 jours."
+  },
+  "Identité personnelle perturbée": {
+    "court": "Le patient recevra un soutien pour restaurer son identité personnelle dans les 24 heures.",
+    "moyen": "Le patient commencera à rétablir une image de soi saine après 3 jours.",
+    "long": "Le patient maintiendra une identité personnelle stable après 7 jours."
+  },
+  "Image corporelle perturbée": {
+    "court": "Le patient recevra un soutien pour améliorer son image corporelle dans les 24 heures.",
+    "moyen": "L'image corporelle du patient s'améliorera après 3 jours.",
+    "long": "Le patient maintiendra une image corporelle positive après 7 jours."
+  },
+  "Inadaptation à un changement dans l'état de santé": {
+    "court": "Le patient recevra un soutien pour s'adapter au changement de santé dans les 24 heures.",
+    "moyen": "Le patient commencera à s'adapter au changement après 3 jours.",
+    "long": "Le patient aura appris à gérer efficacement les changements dans son état de santé après 7 jours."
+  },
+  "Maintien inefficace de l'état de santé": {
+    "court": "Le patient recevra un traitement pour améliorer le maintien de son état de santé dans les 24 heures.",
+    "moyen": "L'état de santé du patient se stabilisera après 3 jours.",
+    "long": "Le patient maintiendra un état de santé stable et efficace après 7 jours."
+  },
+  "Motivation à améliorer la prise en charge de son programme thérapeutique": {
+    "court": "Le patient sera motivé à suivre son programme thérapeutique dans les 24 heures.",
+    "moyen": "Le patient commencera à suivre son programme thérapeutique plus efficacement après 3 jours.",
+    "long": "Le patient maintiendra une prise en charge thérapeutique efficace et régulière après 7 jours."
+  },
+  "Motivation à améliorer le concept de soi": {
+    "court": "Le patient sera motivé à améliorer son concept de soi dans les 24 heures.",
+    "moyen": "Le patient commencera à développer un concept de soi plus positif après 3 jours.",
+    "long": "Le patient maintiendra une image de soi positive et stable après 7 jours."
+  },
+  "Négligence de l'hémicorps": {
+    "court": "Le patient recevra un soutien pour éviter la négligence de l'hémicorps dans les 24 heures.",
+    "moyen": "Le patient commencera à prêter attention à l'hémicorps négligé après 3 jours.",
+    "long": "Le patient maintiendra une attention égale à l'ensemble de son corps après 7 jours."
+  },
+  "Non observance (préciser)": {
+    "court": "Le patient recevra un soutien pour améliorer son observance du traitement dans les 24 heures.",
+    "moyen": "Le patient commencera à suivre les recommandations du traitement après 3 jours.",
+    "long": "Le patient maintiendra une observance thérapeutique régulière après 7 jours."
+  },
+  "Peur": {
+    "court": "Le patient recevra un traitement pour réduire sa peur dans les 24 heures.",
+    "moyen": "Le patient commencera à gérer ses peurs de manière efficace après 3 jours.",
+    "long": "Le patient maintiendra une gestion efficace de ses peurs après 7 jours."
+  },
+  "Prise en charge efficace du programme thérapeutique": {
+    "court": "Le patient recevra un soutien pour suivre son programme thérapeutique efficacement dans les 24 heures.",
+    "moyen": "Le patient commencera à suivre son programme thérapeutique de manière efficace après 3 jours.",
+    "long": "Le patient maintiendra une prise en charge thérapeutique efficace et autonome après 7 jours."
+  },
+  "Prise en charge inefficace du programme thérapeutique": {
+    "court": "Le patient recevra des soins pour améliorer la gestion de son programme thérapeutique dans les 24 heures.",
+    "moyen": "Le patient commencera à suivre son programme thérapeutique de manière plus efficace après 3 jours.",
+    "long": "Le patient maintiendra une gestion thérapeutique régulière et efficace après 7 jours."
+  },
+  "Prise en charge inefficace du programme thérapeutique par la famille": {
+    "court": "La famille recevra un soutien pour améliorer la prise en charge du programme thérapeutique dans les 24 heures.",
+    "moyen": "La famille commencera à soutenir le programme thérapeutique de manière plus efficace après 3 jours.",
+    "long": "La famille continuera à soutenir efficacement le programme thérapeutique après 7 jours."
+  },
+  "Prise en charge inefficace du programme thérapeutique par une collectivité": {
+    "court": "La collectivité recevra un soutien pour améliorer la gestion du programme thérapeutique dans les 24 heures.",
+    "moyen": "La collectivité commencera à soutenir efficacement le programme thérapeutique après 3 jours.",
+    "long": "La collectivité maintiendra un soutien efficace au programme thérapeutique après 7 jours."
+  },
+  "Réaction allergique au latex": {
+    "court": "Le patient recevra un traitement pour gérer les réactions allergiques au latex dans les 24 heures.",
+    "moyen": "Les symptômes de réaction allergique au latex du patient se stabiliseront après 3 jours.",
+    "long": "Le patient maintiendra un état stable sans réaction allergique au latex après 7 jours."
+  },
+  "Recherche d'un meilleur état de santé": {
+    "court": "Le patient recevra un soutien pour rechercher un meilleur état de santé dans les 24 heures.",
+    "moyen": "Le patient commencera à améliorer son état de santé après 3 jours.",
+    "long": "Le patient maintiendra un meilleur état de santé après 7 jours."
+  },
+  "Risque d'accident": {
+    "court": "Le patient recevra des soins pour réduire les risques d'accidents dans les 24 heures.",
+    "moyen": "Le patient sera plus conscient des risques d'accident après 3 jours.",
+    "long": "Le patient aura réduit le risque d'accident après 7 jours."
+  },
+  "Risque d'automutilation": {
+    "court": "Le patient recevra un traitement pour réduire le risque d'automutilation dans les 24 heures.",
+    "moyen": "Le patient commencera à réduire le risque d'automutilation après 3 jours.",
+    "long": "Le patient ne présentera plus de risque d'automutilation après 7 jours."
+  },
+  "Risque d'infection": {
+    "court": "Le patient recevra un traitement pour réduire le risque d'infection dans les 24 heures.",
+    "moyen": "Le patient commencera à réduire le risque d'infection après 3 jours.",
+    "long": "Le patient sera moins exposé aux infections après 7 jours."
+  },
+  "Risque d'intoxication": {
+    "court": "Le patient recevra des soins pour réduire le risque d'intoxication dans les 24 heures.",
+    "moyen": "Le risque d'intoxication sera réduit après 3 jours.",
+    "long": "Le patient sera capable de prévenir l'intoxication après 7 jours."
+  },
+  "Risque de blessure en péri-opératoire": {
+    "court": "Le patient recevra un traitement pour prévenir les blessures en péri-opératoire dans les 24 heures.",
+    "moyen": "Le patient sera mieux préparé pour éviter les blessures en péri-opératoire après 3 jours.",
+    "long": "Le risque de blessure en péri-opératoire sera significativement réduit après 7 jours."
+  },
+  "Risque de chute": {
+    "court": "Le patient recevra un soutien pour prévenir les chutes dans les 24 heures.",
+    "moyen": "Le risque de chute sera réduit après 3 jours.",
+    "long": "Le patient sera capable d'éviter les chutes après 7 jours."
+  },
+  "Risque de diminution situationnelle de l'estime de soi": {
+    "court": "Le patient recevra des soins pour prévenir la diminution de son estime de soi dans les 24 heures.",
+    "moyen": "Le patient commencera à maintenir une estime de soi stable après 3 jours.",
+    "long": "L'estime de soi du patient sera maintenue stable après 7 jours."
+  },
+  "Risque de Dysréflexie autonome": {
+    "court": "Le patient recevra des soins pour réduire le risque de dysréflexie autonome dans les 24 heures.",
+    "moyen": "Le patient commencera à réduire le risque de dysréflexie autonome après 3 jours.",
+    "long": "Le risque de dysréflexie autonome sera réduit après 7 jours."
+  },
+  "Risque de réaction allergique au latex": {
+    "court": "Le patient recevra un traitement pour prévenir une réaction allergique au latex dans les 24 heures.",
+    "moyen": "Le risque de réaction allergique au latex sera réduit après 3 jours.",
+    "long": "Le patient sera protégé contre les réactions allergiques au latex après 7 jours."
+  },
+  "Risque de suicide": {
+    "court": "Le patient recevra un soutien immédiat pour prévenir tout risque de suicide dans les 24 heures.",
+    "moyen": "Le patient commencera à gérer ses pensées suicidaires de manière plus efficace après 3 jours.",
+    "long": "Le risque de suicide sera considérablement réduit après 7 jours."
+  },
+  "Risque de Syndrome d'inadaptation à un changement de milieu": {
+    "court": "Le patient recevra un soutien pour prévenir le syndrome d'inadaptation à un changement de milieu dans les 24 heures.",
+    "moyen": "Le patient commencera à s'adapter au changement après 3 jours.",
+    "long": "Le patient sera bien adapté au changement de milieu après 7 jours."
+  },
+  "Risque de syndrome de mort subite du nourrisson": {
+    "court": "Le patient recevra un soutien pour prévenir le syndrome de mort subite du nourrisson dans les 24 heures.",
+    "moyen": "Le risque de syndrome de mort subite du nourrisson sera réduit après 3 jours.",
+    "long": "Le risque de syndrome de mort subite sera minimisé après 7 jours."
+  },
+  "Risque de trauma": {
+    "court": "Le patient recevra un soutien pour réduire le risque de trauma dans les 24 heures.",
+    "moyen": "Le risque de trauma sera réduit après 3 jours.",
+    "long": "Le patient sera moins exposé aux traumatismes après 7 jours."
+  },
+  "Risque de violence envers les autres": {
+    "court": "Le patient recevra un soutien pour prévenir la violence envers les autres dans les 24 heures.",
+    "moyen": "Le risque de violence envers les autres sera réduit après 3 jours.",
+    "long": "Le patient maintiendra une attitude pacifique envers les autres après 7 jours."
+  },
+  "Risque de violence envers soi": {
+    "court": "Le patient recevra un soutien pour prévenir la violence envers soi dans les 24 heures.",
+    "moyen": "Le risque de violence envers soi sera réduit après 3 jours.",
+    "long": "Le patient sera en sécurité et ne présentera plus de risques envers lui-même après 7 jours."
+  },
+  "Syndrome d'inadaptation à un changement de milieu": {
+    "court": "Le patient recevra un soutien pour prévenir le syndrome d'inadaptation à un changement de milieu dans les 24 heures.",
+    "moyen": "Le patient commencera à s'adapter au changement de milieu après 3 jours.",
+    "long": "Le patient s'adaptera pleinement au changement de milieu après 7 jours."
+  },
+  "Syndrome post-traumatique": {
+    "court": "Le patient recevra un soutien immédiat pour gérer les symptômes du syndrome post-traumatique dans les 24 heures.",
+    "moyen": "Le patient commencera à surmonter les symptômes du syndrome post-traumatique après 3 jours.",
+    "long": "Le patient maintiendra une gestion efficace des symptômes post-traumatiques après 7 jours."
+  },
+
+// --- Besoin 10 : Communiquer avec ses semblables
+  "Communication verbale altérée": {
+    "court": "Le patient recevra une aide pour améliorer sa communication verbale dans les 24 heures.",
+    "moyen": "Le patient participera à des exercices de communication après 3 jours.",
+    "long": "Le patient communiquera efficacement et verbalement avec les autres après 7 jours."
+  },
+  "Dysfonctionnement sexuel": {
+    "court": "Le patient sera orienté vers un professionnel pour discuter de ses troubles sexuels dans les 24 heures.",
+    "moyen": "Le patient commencera un plan de prise en charge adapté après 3 jours.",
+    "long": "Le patient retrouvera une vie sexuelle satisfaisante après 7 jours ou selon l’évolution du plan."
+  },
+  "Habitudes sexuelles perturbées": {
+    "court": "Le patient recevra un accompagnement psychologique dans les 24 heures.",
+    "moyen": "Le patient exprimera ses préoccupations liées à sa sexualité après 3 jours.",
+    "long": "Le patient rétablira des habitudes sexuelles saines après 7 jours ou selon les besoins."
+  },
+  "Interactions sociales perturbées": {
+    "court": "Le patient sera encouragé à interagir avec les autres dans les 24 heures.",
+    "moyen": "Le patient participera à des activités de groupe après 3 jours.",
+    "long": "Le patient rétablira des relations sociales harmonieuses après 7 jours."
+  },
+  "Isolement social": {
+    "court": "Le patient bénéficiera d’un soutien pour réduire son isolement dans les 24 heures.",
+    "moyen": "Le patient commencera à tisser des liens sociaux après 3 jours.",
+    "long": "Le patient maintiendra une vie sociale active et intégrée après 7 jours."
+  },
+  "Motivation à améliorer sa communication": {
+    "court": "Le patient exprimera sa volonté d'améliorer sa communication dans les 24 heures.",
+    "moyen": "Le patient adoptera des stratégies de communication efficaces après 3 jours.",
+    "long": "Le patient communiquera avec aisance et assurance après 7 jours."
+  },
+  "Risque de sentiment de solitude": {
+    "court": "Le patient sera orienté vers un groupe de soutien dans les 24 heures.",
+    "moyen": "Le patient participera à des interactions sociales régulières après 3 jours.",
+    "long": "Le patient se sentira intégré et soutenu dans son environnement après 7 jours."
+  },
+  "Syndrome du traumatisme de viol": {
+    "court": "Le patient sera pris en charge psychologiquement immédiatement.",
+    "moyen": "Le patient participera à des séances thérapeutiques régulières après 3 jours.",
+    "long": "Le patient retrouvera une stabilité émotionnelle et psychologique après 7 jours ou plus."
+  },
+  "Syndrome du traumatisme de viol: réaction mixte": {
+    "court": "Le patient recevra un accompagnement adapté à sa réaction mixte dans les 24 heures.",
+    "moyen": "Le patient exprimera ses émotions contradictoires dans un cadre thérapeutique après 3 jours.",
+    "long": "Le patient stabilisera ses réactions émotionnelles après 7 jours ou selon l’évolution."
+  },
+  "Syndrome du traumatisme de viol: réaction silencieuse": {
+    "court": "Le patient sera encouragé à exprimer ses émotions dans un cadre sécurisé dans les 24 heures.",
+    "moyen": "Le patient commencera à verbaliser son expérience après 3 jours.",
+    "long": "Le patient rétablira une communication émotionnelle saine après 7 jours ou selon la progression."
+  },
+  "Troubles de la perception sensorielle (préciser)": {
+    "court": "Le patient recevra une évaluation spécialisée pour ses troubles sensoriels dans les 24 heures.",
+    "moyen": "Un plan de prise en charge personnalisé sera mis en œuvre après 3 jours.",
+    "long": "Le patient s’adaptera progressivement à ses troubles sensoriels après 7 jours ou plus."
+  },
+
+  // --- Besoin 11 : Se réaliser / valeurs spirituelles
+  "Angoisse face à la mort": {
+    "court": "Le patient recevra un soutien spirituel ou psychologique dans les 24 heures.",
+    "moyen": "Le patient discutera de ses angoisses avec un professionnel après 3 jours.",
+    "long": "Le patient développera un sentiment de paix intérieure face à la mort après 7 jours."
+  },
+  "Conflit décisionnel (préciser)": {
+    "court": "Le patient recevra une aide à la décision dans les 24 heures.",
+    "moyen": "Le patient clarifiera ses priorités et options après 3 jours.",
+    "long": "Le patient prendra des décisions cohérentes avec ses valeurs après 7 jours."
+  },
+  "Détresse spirituelle": {
+    "court": "Le patient sera soutenu par une personne-ressource spirituelle dans les 24 heures.",
+    "moyen": "Le patient exprimera ses conflits spirituels après 3 jours.",
+    "long": "Le patient retrouvera un équilibre spirituel après 7 jours."
+  },
+  "Motivation à améliorer sa pratique religieuse": {
+    "court": "Le patient exprimera sa volonté de renforcer sa pratique religieuse dans les 24 heures.",
+    "moyen": "Le patient intégrera des rituels religieux à son quotidien après 3 jours.",
+    "long": "Le patient maintiendra une pratique religieuse stable et enrichissante après 7 jours."
+  },
+  "Motivation à améliorer son bien-être spirituel": {
+    "court": "Le patient participera à des activités favorisant le bien-être spirituel dans les 24 heures.",
+    "moyen": "Le patient adoptera des pratiques régulières favorisant la sérénité après 3 jours.",
+    "long": "Le patient atteindra une paix spirituelle durable après 7 jours."
+  },
+  "Perte d'élan vital chez l'adulte": {
+    "court": "Le patient recevra un soutien pour retrouver du sens dans son quotidien dans les 24 heures.",
+    "moyen": "Le patient s’engagera dans des activités motivantes après 3 jours.",
+    "long": "Le patient retrouvera un élan vital et une motivation durable après 7 jours."
+  },
+  "Perte d'espoir": {
+    "court": "Le patient recevra un accompagnement psychologique immédiat.",
+    "moyen": "Le patient identifira des objectifs de vie significatifs après 3 jours.",
+    "long": "Le patient retrouvera espoir et perspective d’avenir après 7 jours."
+  },
+  "Pratique religieuse perturbée": {
+    "court": "Le patient recevra un accompagnement spirituel adapté dans les 24 heures.",
+    "moyen": "Le patient réorganisera ses pratiques selon ses croyances après 3 jours.",
+    "long": "Le patient maintiendra une pratique religieuse cohérente avec ses convictions après 7 jours."
+  },
+  "Risque de détresse spirituelle": {
+    "court": "Le patient sera observé et accompagné spirituellement dans les 24 heures.",
+    "moyen": "Le patient exprimera ses préoccupations spirituelles après 3 jours.",
+    "long": "Le patient évitera toute détresse spirituelle avec un soutien approprié après 7 jours."
+  },
+  "Risque de perturbation de la pratique religieuse": {
+    "court": "Le patient sera soutenu pour maintenir sa pratique religieuse dans les 24 heures.",
+    "moyen": "Le patient exprimera les obstacles rencontrés après 3 jours.",
+    "long": "Le patient surmontera les difficultés et reprendra sa pratique religieuse après 7 jours."
+  },
+  "Risque de sentiment d'impuissance": {
+    "court": "Le patient bénéficiera d’un accompagnement visant à renforcer son autonomie dans les 24 heures.",
+    "moyen": "Le patient retrouvera des moyens d’agir sur sa situation après 3 jours.",
+    "long": "Le patient développera un sentiment de contrôle sur sa vie après 7 jours."
+  },
+  "Sentiment d'impuissance": {
+    "court": "Le patient sera soutenu psychologiquement pour retrouver confiance dans les 24 heures.",
+    "moyen": "Le patient sera encouragé à prendre des décisions et à participer activement à ses soins après 3 jours.",
+    "long": "Le patient retrouvera un sentiment d’efficacité personnelle après 7 jours."
+  },
+
+// --- Besoin 12 : S’occuper en vue de se réaliser
+  "Conflit face au rôle parental": {
+    "court_terme": "Identifier les sources principales de conflit dans le rôle parental.",
+    "moyen_terme": "Mettre en place des stratégies de communication familiale adaptées.",
+    "long_terme": "Maintenir un équilibre dans le rôle parental avec une réduction significative des conflits."
+  },
+  "Dynamique familiale dysfonctionnelle: alcoolisme": {
+    "court_terme": "Reconnaître les effets de l’alcoolisme sur la dynamique familiale.",
+    "moyen_terme": "Participer à des séances de soutien familial.",
+    "long_terme": "Établir une dynamique familiale plus stable avec réduction de l’impact de l’alcoolisme."
+  },
+  "Dynamique familiale perturbée": {
+    "court_terme": "Identifier les membres impliqués dans les conflits familiaux.",
+    "moyen_terme": "Développer des moyens de communication efficaces au sein de la famille.",
+    "long_terme": "Favoriser un environnement familial stable et fonctionnel."
+  },
+  "Exercice du rôle parental perturbé": {
+    "court_terme": "Évaluer les difficultés rencontrées dans l’exercice du rôle parental.",
+    "moyen_terme": "Suivre un accompagnement sur les techniques parentales.",
+    "long_terme": "Exercer un rôle parental cohérent et structuré."
+  },
+  "Exercice inefficace du rôle": {
+    "court_terme": "Identifier les tâches liées à son rôle et les difficultés rencontrées.",
+    "moyen_terme": "Améliorer les compétences et la confiance dans l’exercice du rôle.",
+    "long_terme": "Assumer efficacement son rôle avec autonomie."
+  },
+  "Motivation à améliorer la dynamique familiale": {
+    "court_terme": "Exprimer sa volonté d'améliorer les relations familiales.",
+    "moyen_terme": "Initier des actions concrètes de renforcement du lien familial.",
+    "long_terme": "Contribuer activement à une dynamique familiale harmonieuse."
+  },
+  "Motivation à améliorer ses stratégies d'adaptation": {
+    "court_terme": "Identifier les situations sources de stress.",
+    "moyen_terme": "Tester de nouvelles stratégies d’adaptation positives.",
+    "long_terme": "Utiliser régulièrement des stratégies d’adaptation efficaces."
+  },
+  "Motivation d'une collectivité à améliorer ses stratégies d'adaptation": {
+    "court_terme": "Organiser des réunions pour discuter des défis collectifs.",
+    "moyen_terme": "Mettre en place des plans d’action communautaires.",
+    "long_terme": "Renforcer la résilience de la collectivité face aux situations difficiles."
+  },
+  "Motivation d'une famille à améliorer ses stratégies d'adaptation": {
+    "court_terme": "Identifier les mécanismes d'adaptation inefficaces au sein de la famille.",
+    "moyen_terme": "Adopter des techniques d’adaptation collectives adaptées.",
+    "long_terme": "Maintenir une capacité d’adaptation familiale efficace."
+  },
+  "Risque de perturbation dans l'exercice du rôle parental": {
+    "court_terme": "Surveiller les facteurs pouvant nuire à l'exercice du rôle parental.",
+    "moyen_terme": "Mettre en œuvre des ressources pour soutenir le rôle parental.",
+    "long_terme": "Prévenir les perturbations futures en assurant un soutien continu."
+  },
+  "Risque de perturbation de l'attachement parent-enfant": {
+    "court_terme": "Encourager les interactions positives parents-enfant.",
+    "moyen_terme": "Accompagner les parents dans le renforcement du lien affectif.",
+    "long_terme": "Préserver une relation d’attachement saine et stable."
+  },
+  "Risque de tension dans l'exercice du rôle de l'aidant naturel": {
+    "court_terme": "Identifier les signes de surcharge chez l’aidant.",
+    "moyen_terme": "Proposer des moments de répit ou des aides extérieures.",
+    "long_terme": "Réduire les tensions liées au rôle de l’aidant par un soutien constant."
+  },
+  "Stratégies d'adaptation défensives": {
+    "court_terme": "Reconnaître les comportements défensifs inadaptés.",
+    "moyen_terme": "Explorer des réponses émotionnelles plus constructives.",
+    "long_terme": "Adopter des stratégies d’adaptation plus saines à long terme."
+  },
+  "Stratégies d'adaptation familiale compromises": {
+    "court_terme": "Identifier les situations où les stratégies échouent.",
+    "moyen_terme": "Rechercher de l’aide professionnelle ou communautaire.",
+    "long_terme": "Renforcer la capacité d’adaptation familiale aux changements."
+  },
+  "Stratégies d'adaptation familiale inefficaces d'une collectivité": {
+    "court_terme": "Analyser les réponses collectives face aux crises.",
+    "moyen_terme": "Proposer des alternatives aux réponses inefficaces.",
+    "long_terme": "Développer des mécanismes d’adaptation communautaires fonctionnels."
+  },
+  "Stratégies d'adaptation familiale invalidantes": {
+    "court_terme": "Reconnaître l’impact négatif des stratégies actuelles.",
+    "moyen_terme": "Encourager des stratégies positives centrées sur la collaboration.",
+    "long_terme": "Remplacer les stratégies invalidantes par des comportements sains."
+  },
+  "Stratégies d'adaptation inefficaces": {
+    "court_terme": "Observer et noter les situations de stress mal gérées.",
+    "moyen_terme": "Mettre en place un plan d'adaptation personnalisé.",
+    "long_terme": "Utiliser régulièrement des stratégies efficaces face aux difficultés."
+  },
+  "Tension dans l'exercice du rôle de l'aidant naturel": {
+    "court_terme": "Évaluer les signes de détresse chez l’aidant.",
+    "moyen_terme": "Suggérer des ressources de soutien spécifiques.",
+    "long_terme": "Assurer un équilibre entre rôle d’aidant et bien-être personnel."
+  },
+
+// --- Besoin 13 : Se recréer (se divertir)
+  "Activités de loisirs insuffisantes": {
+    "court_terme": "Identifier les préférences de loisirs du patient.",
+    "moyen_terme": "Encourager la participation à une activité régulière.",
+    "long_terme": "Maintenir une routine d'activités de loisirs bénéfique pour le bien-être."
+  },
+
+// --- Besoin 14 : Apprendre
+  "Confusion aiguë": {
+    "court_terme": "Reconnaître les épisodes de confusion et leurs déclencheurs.",
+    "moyen_terme": "Stabiliser les fonctions cognitives par un environnement structuré.",
+    "long_terme": "Réduire les épisodes de confusion aiguë à travers une prise en charge adaptée."
+  },
+  "Confusion chronique": {
+    "court_terme": "Évaluer l’état cognitif de manière quotidienne.",
+    "moyen_terme": "Adapter l’environnement aux capacités du patient.",
+    "long_terme": "Assurer une prise en charge continue pour limiter les régressions."
+  },
+  "Connaissances insuffisantes": {
+    "court_terme": "Identifier les lacunes dans les connaissances du patient.",
+    "moyen_terme": "Mettre en œuvre un programme d’éducation personnalisé.",
+    "long_terme": "Permettre au patient d’appliquer ses nouvelles connaissances de manière autonome."
+  },
+  "Errance": {
+    "court_terme": "Observer et documenter les comportements d’errance.",
+    "moyen_terme": "Créer un environnement sécurisé et apaisant.",
+    "long_terme": "Réduire les épisodes d’errance par une prise en charge globale."
+  },
+  "Motivation à améliorer ses connaissances": {
+    "court_terme": "Exprimer l’envie d’en apprendre davantage sur sa santé.",
+    "moyen_terme": "Participer activement aux séances d’information.",
+    "long_terme": "Développer une autonomie basée sur les connaissances acquises."
+  },
+  "Opérations de la pensée perturbées": {
+    "court_terme": "Détecter les distorsions dans la pensée.",
+    "moyen_terme": "Apporter un soutien cognitif à travers des activités stimulantes.",
+    "long_terme": "Améliorer la cohérence des processus de pensée."
+  },
+  "Syndrome d'interprétation erronée de l'environnement": {
+    "court_terme": "Identifier les signes d’interprétation erronée.",
+    "moyen_terme": "Adapter les interactions pour éviter les malentendus.",
+    "long_terme": "Diminuer les fausses interprétations et favoriser la réalité partagée."
+  },
+  "Troubles de la mémoire": {
+    "court_terme": "Évaluer les capacités de mémoire à court et long terme.",
+    "moyen_terme": "Introduire des outils de compensation (agenda, repères visuels...).",
+    "long_terme": "Maintenir l’autonomie en favorisant les fonctions mnésiques restantes."
+  },
+    };
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+
+    function logout() {
+      window.location.href = 'login.html';
+    }
+
+    document.getElementById('username').textContent = localStorage.getItem('username') || 'Utilisateur';
+
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    patients.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = `${p.prenom} ${p.nom}`;
+      document.getElementById('patient-list').appendChild(li);
+    });
+
+    const selectedDiagnostics = (localStorage.getItem('diagnosticFormule') || '').split('\n').filter(Boolean);
+    const objectifsContainer = document.getElementById('objectifsContainer');
+
+    selectedDiagnostics.forEach(diagnostic => {
+      const id = diagnostic.replace(/\s+/g, '_');
+      const objectifs = objectifsPredefinis[diagnostic] || { court: '', moyen: '', long: '' };
+
+      const block = document.createElement('div');
+      block.className = 'diagnostic-block';
+      block.innerHTML = `
+        <h2>${diagnostic}</h2>
+        <div class="goals">
+          <div class="goal-card"><h3>Objectif court terme</h3><textarea id="${id}_court">${objectifs.court}</textarea></div>
+          <div class="goal-card"><h3>Objectif moyen terme</h3><textarea id="${id}_moyen">${objectifs.moyen}</textarea></div>
+          <div class="goal-card"><h3>Objectif long terme</h3><textarea id="${id}_long">${objectifs.long}</textarea></div>
+        </div>`;
+      objectifsContainer.appendChild(block);
+    });
+
+    function enregistrerObjectifs() {
+      const objectifs = {};
+      selectedDiagnostics.forEach(diagnostic => {
+        const id = diagnostic.replace(/\s+/g, '_');
+        objectifs[diagnostic] = {
+          court: document.getElementById(`${id}_court`).value,
+          moyen: document.getElementById(`${id}_moyen`).value,
+          long: document.getElementById(`${id}_long`).value
+        };
+      });
+      localStorage.setItem('objectifsSoins', JSON.stringify(objectifs));
+      alert("Objectifs enregistrés avec succès.");
+    }
+
+    function validerObjectifs() {
+      enregistrerObjectifs();
+      window.location.href = 'planification.html';
+    }
+  </script>
+</body>
+</html>

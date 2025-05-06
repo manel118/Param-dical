@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Données du malade</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { display: flex; background-color: #f3f4f6; height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 250px;
+      background-color: #1e2a38;
+      color: white;
+      padding: 1rem;
+      overflow-y: auto;
+      transition: width 0.3s ease, padding 0.3s ease;
+    }
+    .sidebar.collapsed {
+      width: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .sidebar h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+    .sidebar ul { list-style: none; }
+    .sidebar ul li { padding: 10px; margin-bottom: 10px; background-color: #2a3b4c; border-radius: 8px; cursor: pointer; transition: background 0.3s; }
+    .sidebar ul li:hover { background-color: #3d5a73; }
+
+    /* Main content */
+    .main { flex: 1; padding: 2rem; overflow-y: auto; transition: padding 0.3s ease; }
+
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .menu-toggle { font-size: 28px; cursor: pointer; color: #3d5a73; margin-right: 1rem; }
+    .user-box { display: flex; align-items: center; cursor: pointer; position: relative; }
+    .user-box i { font-size: 32px; margin-right: 8px; color: #3d5a73; }
+    .logout-menu { position: absolute; top: 40px; right: 0; background-color: white; border: 1px solid #ccc; padding: 8px 12px; border-radius: 8px; display: none; }
+    .user-box:hover .logout-menu { display: block; }
+
+    /* Form styling */
+    .form-container { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom: 1.5rem; }
+    label { font-weight: bold; display: block; margin-bottom: 0.5rem; }
+    input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9fafb; }
+    textarea { resize: vertical; }
+
+    /* Vitals grid */
+    .vitals-container { display: flex; flex-wrap: wrap; gap: 20px; }
+    .vital-item { flex: 1 1 200px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 12px; text-align: center; }
+    .vital-item .material-icons, .vital-item svg.icon-lung { font-size: 36px; color: #3d5a73; margin-bottom: 8px; }
+    .vital-item svg.icon-lung { width: 36px; height: 36px; }
+    .vital-item input { width: 50px; margin: 4px auto; text-align: center; }
+
+    /* Buttons */
+    .btns { display: flex; align-items: center; margin-top: 1.5rem; }
+    button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .btn-edit { background-color: #3d5a73; color: white; }
+    .btn-exit { background-color: #e53935; color: white; margin: 0 auto; }
+    .btn-save { background-color: #4caf50; color: white; margin-left: auto; }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <h2>Liste des patients</h2>
+    <ul id="patient-list"></ul>
+  </div>
+  <div class="main" id="mainContent">
+    <div class="top-bar">
+      <span class="material-icons menu-toggle" onclick="toggleSidebar()">menu</span>
+      <h2>Données du malade</h2>
+      <div class="user-box">
+        <i class="material-icons">account_circle</i>
+        <span id="username"></span>
+        <div class="logout-menu" onclick="logout()">Se déconnecter</div>
+      </div>
+    </div>
+    <div class="form-container">
+      <div id="info-fields"></div>
+      <div class="form-group">
+        <label for="notes">Observations / Notes</label>
+        <textarea id="notes" disabled rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Indicateurs vitaux</label>
+        <div class="vitals-container">
+          <!-- Vitals items here -->
+          <div class="vital-item">
+            <span class="material-icons">monitor_heart</span>
+            <div>Glycémie (mg/dL)</div>
+            <input id="glycemia" type="text" disabled placeholder="---" />
+          </div>
+          <div class="vital-item">
+            <span class="material-icons">favorite</span>
+            <div>Fréq. cardiaque (bpm)</div>
+            <input id="heartRate" type="text" disabled placeholder="---" />
+          </div>
+          <div class="vital-item">
+            <svg class="icon-lung" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+              <path d="M32 2C26 8 26 20 26 32s-4 22-10 30" fill="none" stroke="#3d5a73" stroke-width="4"/>
+              <path d="M32 2c6 6 6 18 6 30s4 22 10 30" fill="none" stroke="#3d5a73" stroke-width="4"/>
+            </svg>
+            <div>SpO₂ (%)</div>
+            <input id="spo2" type="text" disabled placeholder="---" />
+          </div>
+          <div class="vital-item">
+            <span class="material-icons">favorite</span>
+            <div>Tension artérielle (mmHg)</div>
+            <input id="bp-sys" type="text" disabled placeholder="Sys" />
+            <input id="bp-dia" type="text" disabled placeholder="Dia" />
+          </div>
+          <div class="vital-item">
+            <span class="material-icons">thermostat</span>
+            <div>Température (°C)</div>
+            <input id="temperature" type="text" disabled placeholder="---" />
+          </div>
+          <div class="vital-item">
+            <span class="material-icons">air</span>
+            <div>Fréquence respiratoire (cpm)</div>
+            <input id="respiration" type="text" disabled placeholder="---" />
+          </div>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn-edit" onclick="enableEdit()">Modifier</button>
+        <button class="btn-exit" onclick="logout()">Sortie du patient</button>
+        <button class="btn-save" onclick="validerInfos()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    // User display
+    const user = localStorage.getItem('username') || 'Utilisateur';
+    document.getElementById('username').textContent = user;
+
+    // Toggle sidebar collapse
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+
+    // Logout function
+    function logout() {
+      localStorage.removeItem('username');
+      window.location.href = 'login.html';
+    }
+
+    // Dynamic info fields
+    const champsInfo = [
+      ['nom', 'Nom'], ['prenom', 'Prénom'], ['chambre', 'Numéro de chambre'], ['age', 'Âge / Date de naissance'],
+      ['nationalite', 'Nationalité et langue parlée'], ['prise_charge', 'Prise en charge sociale'], ['situation_pro', 'Situation socio-professionnelle'],
+      ['situation_familiale', 'Situation familiale'], ['adresse', 'Adresse (ville)'], ['elements_significatifs', 'Éléments significatifs'],
+      ['date_entree', 'Date d’entrée'], ['motif_hosp', 'Motif d’hospitalisation'], ['antecedents', 'Antécédents médicaux'],
+      ['allergies', 'Allergies'], ['histoire_maladie', 'Histoire de la maladie'], ['resume_hosp', 'Résumé de l’hospitalisation'],
+      ['appareillage', 'Appareillage'], ['devenir', 'Devenir prévu'], ['medecin_ref', 'Médecin référent (optionnel)']
+    ];
+    const container = document.getElementById('info-fields');
+    champsInfo.forEach(([id, label]) => {
+      const group = document.createElement('div');
+      group.className = 'form-group';
+      group.innerHTML = `<label for="${id}">${label}</label><input type="text" id="${id}" disabled />`;
+      container.appendChild(group);
+    });
+
+    // Load existing data
+    const data = JSON.parse(localStorage.getItem('selectedPatient') || '{}');
+    champsInfo.forEach(([id]) => { if (data[id]) document.getElementById(id).value = data[id]; });
+    if (data.notes) document.getElementById('notes').value = data.notes;
+    ['glycemia','heartRate','spo2','bpSys','bpDia','temperature','respiration'].forEach(key => {
+      const elId = key === 'bpSys' ? 'bp-sys' : (key === 'bpDia' ? 'bp-dia' : key);
+      const el = document.getElementById(elId);
+      if (data[key]) el.value = data[key];
+    });
+
+    // Enable edit
+    function enableEdit() {
+      champsInfo.forEach(([id]) => document.getElementById(id).disabled = false);
+      document.getElementById('notes').disabled = false;
+      ['glycemia','heartRate','spo2','bp-sys','bp-dia','temperature','respiration'].forEach(id => document.getElementById(id).disabled = false);
+    }
+
+    // Save data
+    function validerInfos() {
+      const newData = { ...data };
+      champsInfo.forEach(([id]) => newData[id] = document.getElementById(id).value);
+      newData.notes = document.getElementById('notes').value;
+      ['glycemia','heartRate','spo2','bp-sys','bp-dia','temperature','respiration'].forEach(key => {
+        const elId = key === 'bpSys' ? 'bp-sys' : (key === 'bpDia' ? 'bp-dia' : key);
+        newData[key] = document.getElementById(elId).value;
+      });
+      localStorage.setItem('selectedPatient', JSON.stringify(newData));
+      window.location.href = 'demarche.html';
+    }
+
+    // Populate sidebar
+    JSON.parse(localStorage.getItem('patients') || '[]').forEach(patient => {
+      const li = document.createElement('li');
+      li.textContent = `${patient.prenom} ${patient.nom}`;
+      document.getElementById('patient-list').appendChild(li);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagnostics infirmiers</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { display: flex; background-color: #f3f4f6; height: 100vh; }
+
+    .sidebar {
+      width: 250px;
+      background-color: #1e2a38;
+      color: white;
+      padding: 1rem;
+      overflow-y: auto;
+      transition: width 0.3s ease, padding 0.3s ease;
+    }
+    .sidebar.collapsed {
+      width: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .sidebar h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+    .sidebar ul { list-style: none; }
+    .sidebar ul li {
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #2a3b4c;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .sidebar ul li:hover { background-color: #3d5a73; }
+
+    .main {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      transition: padding 0.3s ease;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .menu-toggle {
+      font-size: 28px;
+      cursor: pointer;
+      color: #3d5a73;
+      margin-right: 1rem;
+    }
+
+    .user-box {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .user-box i {
+      font-size: 32px;
+      margin-right: 8px;
+      color: #3d5a73;
+    }
+
+    .logout-menu {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .user-box:hover .logout-menu { display: block; }
+
+    .form-container {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .diagnostics-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .diagnostics-section h3 {
+      margin-bottom: 0.5rem;
+      color: #1e2a38;
+    }
+
+    .diagnostics-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .diagnostic-card {
+      padding: 10px 16px;
+      background-color: #f9fafb;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .diagnostic-card:hover {
+      border-color: #0d9488;
+    }
+
+    .diagnostic-card.selected {
+      border: 2px solid #3d5a73;
+      background-color: #e6f7ff;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin: 1rem 0 0.5rem;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #f9fafb;
+    }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 1.5rem;
+      justify-content: space-between;
+    }
+
+    .btn-save {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    .btn-next {
+      background-color: #0d9488;
+      color: white;
+    }
+
+    .btn-exit {
+      background-color: #607d8b;
+      color: white;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <h2>Liste des patients</h2>
+    <ul id="patient-list"></ul>
+  </div>
+  <div class="main">
+    <div class="top-bar">
+      <span class="material-icons menu-toggle" onclick="toggleSidebar()">menu</span>
+      <h2>Diagnostics infirmiers</h2>
+      <div class="user-box">
+        <i class="material-icons">account_circle</i>
+        <span id="username"></span>
+        <div class="logout-menu" onclick="logout()">Se déconnecter</div>
+      </div>
+    </div>
+    <div class="form-container">
+      <div id="diagnosticsContainer"></div>
+      <label for="formulatedDiagnosis">Formulation du diagnostic infirmier (PES) :</label>
+      <textarea id="formulatedDiagnosis" rows="6" placeholder="Les diagnostics sélectionnés apparaîtront ici... Vous pouvez les modifier selon le modèle P.E.S"></textarea>
+      <div class="btns">
+        <button class="btn-exit" onclick="goBack()">⬅ Retour</button>
+        <button class="btn-save" onclick="saveFormulatedDiagnosis()">Enregistrer</button>
+        <button class="btn-next" onclick="validerDiagnostics()">➡ Suivant</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const diagnosticsContainer = document.getElementById("diagnosticsContainer");
+    const formulatedDiagnosis = document.getElementById("formulatedDiagnosis");
+    const username = localStorage.getItem("username") || "Utilisateur";
+    document.getElementById("username").textContent = username;
+    const selectedDiagnostics = new Set();
+
+    const besoins = JSON.parse(localStorage.getItem("besoinsSelectionnes") || "[]");
+
+   const diagnosticsMap = {
+  1: [
+    "Dégagement inefficace des voies respiratoires",
+    "Perturbation des échanges gazeux",
+    "Intolérance au sevrage de la ventilation assistée",
+    "Mode de respiration inefficace",
+    "impossibilité de maintenir une respiration spontanée",
+    "Risque élevé de suffocation (manque d'air)",
+    "Risque de fausse route (ou risque d'inhalation ou d'aspiration)",
+    "Risque d'intoxication"
+  ],
+  2: [
+    "Déficit de soins personnels: s'alimenter",
+    "Alimentation déficiente",
+    "Alimentation excessive",
+    "Risque d'alimentation excessive",
+    "Motivation à améliorer son alimentation",
+    "Denture altérée",
+    "Nausées",
+    "Trouble de la déglutition",
+    "Déficit de volume liquidien (déshydratation)",
+    "Risque de déficit de volume liquidien (déshydratation)",
+    "Risque de déséquilibre du volume liquidien",
+    "Excès de volume liquidien (œdème)",
+    "Risque d'aspiration (fausse route)",
+    "Motivation à améliorer son équilibre hydrique",
+    "Mode d'alimentation inefficace chez le nourrisson/nouveau-né",
+    "Allaitement maternel efficace",
+    "Allaitement maternel inefficace",
+    "Allaitement maternel interrompu"
+],
+  3: [
+    "Constipation",
+    "Déficit de soins personnels: utiliser les toilettes",
+    "Diarrhée",
+    "Elimination urinaire altérée",
+    "Incontinence fécale",
+    "Incontinence urinaire à l'effort",
+    "Incontinence urinaire complète (ou vraie)",
+    "Incontinence urinaire fonctionnelle",
+    "Incontinence urinaire par besoin impérieux",
+    "Incontinence urinaire réflexe",
+    "Motivation à améliorer son élimination urinaire",
+    "Pseudo-constipation",
+    "Rétention urinaire",
+    "Risque d'incontinence urinaire par besoin impérieux",
+    "Risque de constipation"
+  ],
+4: [
+    "Capacité intracrânienne diminuée",
+    "Champ énergétique perturbé",
+    "Débit cardiaque diminué",
+    "Désorganisation comportementale chez le nouveau-né/nourrisson",
+    "Difficulté à la marche",
+    "Difficulté lors d'un transfert",
+    "Fatigue",
+    "Intolerance à l'activité",
+    "Irrigation tissulaire inefficace",
+    "Mobilité physique réduite",
+    "Mobilité réduite au lit",
+    "Mobilité réduite en fauteuil roulant",
+    "Mode de vie sédentaire",
+    "Réceptivité du nouveau-né/nourrisson à progresser dans son organisation comportementale",
+    "Rétablissement post opératoire retardé",
+    "Retard de la croissance et du développement",
+    "Risque d'intolérance à l'activité",
+    "Risque de croissance anormale",
+    "Risque de désorganisation comportementale chez le nouveau-né/nourrisson",
+    "Risque de dysfonctionnement neuro-vasculaire périphérique",
+    "Risque de retard de la croissance et du développement",
+    "Risque de syndrome d'immobilité"
+],
+5: [
+    "Fatigue",
+    "Habitudes de sommeil perturbées",
+    "Motivation à améliorer son sommeil",
+    "Privation de sommeil"
+],
+6: [
+    "Déficit de soins personnels: se vêtir/soigner son apparence"
+],
+7: [
+    "Hyperthermie",
+    "Hypothermie",
+    "Risque température corporelle anormale",
+    "Thermorégulation inefficace"
+],
+8: [
+    "Atteinte à l'intégrité de la peau",
+    "Atteinte à l'intégrité des tissus",
+    "Atteinte de la muqueuse buccale",
+    "Déficit de soins personnels: se laver/effectuer les soins d'hygiène",
+    "Denture altérée",
+    "Risque d'atteinte à l'intégrité de la peau"
+],
+9: [
+    "Anxiété",
+    "Automutilation",
+    "Chagrin chronique",
+    "Déni non constructif",
+    "Deuil anticipé",
+    "Deuil dysfonctionnel",
+    "Diminution chronique de l'estime de soi",
+    "Diminution situationnelle de l'estime de soi",
+    "Douleur aiguë",
+    "Douleur chronique",
+    "Dysréflexie autonome",
+    "Entretien inefficace au domicile",
+    "Identité personnelle perturbée",
+    "Image corporelle perturbée",
+    "Inadaptation à un changement dans l'état de santé",
+    "Maintien inefficace de l'état de santé",
+    "Motivation à améliorer la prise en charge de son programme thérapeutique",
+    "Motivation à améliorer le concept de soi",
+    "Négligence de l'hémicorps",
+    "Non observance (préciser)",
+    "Peur",
+    "Prise en charge efficace du programme thérapeutique",
+    "Prise en charge inefficace du programme thérapeutique",
+    "Prise en charge inefficace du programme thérapeutique par la famille",
+    "Prise en charge inefficace du programme thérapeutique par une collectivité",
+    "Réaction allergique au latex",
+    "Recherche d'un meilleur état de santé",
+    "Risque d'accident",
+    "Risque d'automutilation",
+    "Risque d'infection",
+    "Risque d'intoxication",
+    "Risque de blessure en péri-opératoire",
+    "Risque de chute",
+    "Risque de diminution situationnelle de l'estime de soi",
+    "Risque de Dysréflexie autonome",
+    "Risque de réaction allergique au latex",
+    "Risque de suicide",
+    "Risque de Syndrome d'inadaptation à un changement de milieu",
+    "Risque de syndrome de mort subite du nourrisson",
+    "Risque de trauma",
+    "Risque de violence envers les autres",
+    "Risque de violence envers soi",
+    "Syndrome d'inadaptation à un changement de milieu",
+    "Syndrome post-traumatique"
+],
+10: [
+    "Communication verbale altérée",
+    "Dysfonctionnement sexuel",
+    "Habitudes sexuelles perturbées",
+    "Interactions sociales perturbées",
+    "Isolement social",
+    "Motivation à améliorer sa communication",
+    "Risque de sentiment de solitude",
+    "Syndrome du traumatisme de viol",
+    "Syndrome du traumatisme de viol: réaction mixte",
+    "Syndrome du traumatisme de viol: réaction silencieuse",
+    "Troubles de la perception sensorielle (préciser: auditive, gustative, kinesthétique, olfactive, tactile ou visuelle)"
+],
+11: [
+    "Angoisse face à la mort",
+    "Conflit décisionnel (préciser)",
+    "Détresse spirituelle",
+    "Motivation à améliorer sa pratique religieuse",
+    "Motivation à améliorer son bien-être spirituel",
+    "Perte d'élan vital chez l'adulte",
+    "Perte d'espoir",
+    "Pratique religieuse perturbée",
+    "Risque de détresse spirituelle",
+    "Risque de perturbation de la pratique religieuse",
+    "Risque de sentiment d'impuissance",
+    "Sentiment d'impuissance"
+],
+12: [
+    "Conflit face au rôle parental",
+    "Dynamique familiale dysfonctionnelle: alcoolisme",
+    "Dynamique familiale perturbée",
+    "Exercice du rôle parental perturbé",
+    "Exercice inefficace du rôle",
+    "Motivation à améliorer la dynamique familiale",
+    "Motivation à améliorer ses stratégies d'adaptation",
+    "Motivation d'une collectivité à améliorer ses stratégies d'adaptation",
+    "Motivation d'une famille à améliorer ses stratégies d'adaptation",
+    "Risque de perturbation dans l'exercice du rôle parental",
+    "Risque de perturbation de l'attachement parent-enfant",
+    "Risque de tension dans l'exercice du rôle de l'aidant naturel",
+    "Stratégies d'adaptation défensives",
+    "Stratégies d'adaptation familiale compromises",
+    "Stratégies d'adaptation familiale inefficaces d'une collectivité",
+    "Stratégies d'adaptation familiale invalidantes",
+    "Stratégies d'adaptation inefficaces",
+    "Tension dans l'exercice du rôle de l'aidant naturel"
+],
+13: [
+    "Activités de loisirs insuffisantes"
+],
+14: [
+    "Confusion aiguë",
+    "Confusion chronique",
+    "Connaissances insuffisantes",
+    "Errance",
+    "Motivation à améliorer ses connaissances",
+    "Opérations de la pensée perturbées",
+    "Syndrome d'interprétation erronée de l'environnement",
+    "Troubles de la mémoire"
+],
+    };
+
+    besoins.forEach(besoin => {
+      const id = besoin.id;
+      const section = document.createElement("div");
+      section.className = "diagnostics-section";
+      section.innerHTML = `<h3>${besoin.nom}</h3><div class="diagnostics-list"></div>`;
+      const list = section.querySelector(".diagnostics-list");
+      (diagnosticsMap[id] || []).forEach(diag => {
+        const card = document.createElement("div");
+        card.className = "diagnostic-card";
+        card.textContent = diag;
+        card.onclick = () => toggleDiagnostic(card, diag);
+        list.appendChild(card);
+      });
+      diagnosticsContainer.appendChild(section);
+    });
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("collapsed");
+    }
+
+    function logout() {
+      localStorage.removeItem("username");
+      window.location.href = "login.html";
+    }
+
+    function toggleDiagnostic(card, diag) {
+      if (selectedDiagnostics.has(diag)) {
+        selectedDiagnostics.delete(diag);
+        card.classList.remove("selected");
+      } else {
+        selectedDiagnostics.add(diag);
+        card.classList.add("selected");
+      }
+      updateTextArea();
+    }
+
+    function updateTextArea() {
+      const list = Array.from(selectedDiagnostics);
+      formulatedDiagnosis.value = list.join("\n");
+    }
+
+    function saveFormulatedDiagnosis() {
+      const text = formulatedDiagnosis.value.trim();
+      if (text === '') {
+        alert("Veuillez écrire un diagnostic avant de l'enregistrer.");
+        return;
+      }
+      localStorage.setItem("diagnosticFormule", text);
+      alert("Diagnostic enregistré !");
+    }
+
+    function validerDiagnostics() {
+      saveFormulatedDiagnosis();
+      window.location.href = "objectifs.html";
+    }
+
+    function goBack() {
+      window.location.href = "analyse.html"; // تعديل حسب اسم صفحتك السابقة
+    }
+
+    // Liste des patients
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    const listContainer = document.getElementById('patient-list');
+    patients.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = `${p.prenom} ${p.nom}`;
+      listContainer.appendChild(li);
+    });
+  </script>
+</body>
+</html>

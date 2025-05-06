@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planification des soins</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { display: flex; background-color: #f3f4f6; height: 100vh; }
+    .sidebar {
+      width: 250px; background-color: #1e2a38; color: white; padding: 1rem; overflow-y: auto;
+    }
+    .sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+    .sidebar h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar ul li {
+      padding: 10px; margin-bottom: 10px; background-color: #2a3b4c;
+      border-radius: 8px; cursor: pointer;
+    }
+    .sidebar ul li:hover { background-color: #3d5a73; }
+    .main {
+      flex: 1; padding: 2rem; overflow-y: auto;
+    }
+    .top-bar {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+    }
+    .menu-toggle {
+      font-size: 28px; cursor: pointer; color: #3d5a73; margin-right: 1rem;
+    }
+    .user-box {
+      display: flex; align-items: center; cursor: pointer; position: relative;
+    }
+    .user-box i {
+      font-size: 32px; margin-right: 8px; color: #3d5a73;
+    }
+    .logout-menu {
+      position: absolute; top: 40px; right: 0; background-color: white;
+      border: 1px solid #ccc; padding: 8px 12px; border-radius: 8px; display: none;
+    }
+    .user-box:hover .logout-menu { display: block; }
+    h1 { color: #1e2a38; margin-bottom: 1rem; }
+
+    table {
+      width: 100%; border-collapse: collapse; background-color: white; border-radius: 12px; overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #cfd8dc; padding: 10px 12px; text-align: left; vertical-align: top;
+    }
+    th {
+      background-color: #e2e8f0; color: #1e2a38;
+    }
+    td textarea {
+      width: 100%; min-height: 120px; resize: vertical;
+      border: 1px solid #ccc; border-radius: 6px; padding: 8px;
+      font-size: 14px;
+    }
+    .btn-save {
+      background-color: #10b981; color: white; padding: 6px 12px; border: none;
+      border-radius: 6px; cursor: pointer; font-weight: bold;
+    }
+    .btn-save:hover { background-color: #059669; }
+    .saved-by {
+      margin-top: 5px; font-size: 0.85rem; color: #1e2a38;
+    }
+.footer-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+  padding: 0 40px;
+}
+
+.footer-buttons button {
+  padding: 10px 24px;
+  font-weight: bold;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  color: white;
+}
+
+.footer-buttons button:first-child {
+  background-color:  #3d5a73;
+}
+
+.footer-buttons button:first-child:hover {
+  background-color: #1e40af;
+}
+
+.footer-buttons button:last-child {
+  background-color:  #3d5a73;
+}
+
+.footer-buttons button:last-child:hover {
+  background-color: #15803d;
+}
+
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <h2>Liste des patients</h2>
+    <ul id="patient-list"></ul>
+  </div>
+  <div class="main">
+    <div class="top-bar">
+      <span class="material-icons menu-toggle" onclick="toggleSidebar()">menu</span>
+      <h1>5. Planification des soins</h1>
+      <div class="user-box">
+        <i class="material-icons">account_circle</i>
+        <span id="username"></span>
+        <div class="logout-menu" onclick="logout()">Se déconnecter</div>
+      </div>
+    </div>
+<h2>Interventions à court terme</h2>
+<table>
+  <thead>
+  <tr>
+    <th style="width: 20%;">Diagnostic</th>
+    <th style="width: 20%;">Objectif</th>
+    <th style="width: 45%;">Interventions</th>
+    <th style="width: 15%;">Infirmier</th>
+  </tr>
+</thead>
+
+  <tbody id="tableCourt"></tbody>
+</table>
+
+<h2>Interventions à moyen terme</h2>
+<table>
+ <thead>
+  <tr>
+    <th style="width: 20%;">Diagnostic</th>
+    <th style="width: 20%;">Objectif</th>
+    <th style="width: 45%;">Interventions</th>
+    <th style="width: 15%;">Infirmier</th>
+  </tr>
+</thead>
+  <tbody id="tableMoyen"></tbody>
+</table>
+
+<h2>Interventions à long terme</h2>
+<table>
+ <thead>
+  <tr>
+    <th style="width: 20%;">Diagnostic</th>
+    <th style="width: 20%;">Objectif court</th>
+    <th style="width: 45%;">Interventions</th>
+    <th style="width: 15%;">Infirmier</th>
+  </tr>
+</thead>
+
+  <tbody id="tableLong"></tbody>
+</table>
+<div class="footer-buttons">
+  <button onclick="goBack()">Retour</button>
+  <button onclick="goNext()">Suivant</button>
+</div>
+  </div>
+
+  <script>
+    const objectifs = JSON.parse(localStorage.getItem('objectifsSoins') || '{}');
+    const diagnostics = Object.keys(objectifs);
+    const username = localStorage.getItem('username') || 'Utilisateur';
+    document.getElementById('username').textContent = username;
+
+const interventionsPredefinies = {
+
+  "Dégagement inefficace des voies respiratoires": {
+    court: [
+      "Effectuer une kinésithérapie respiratoire deux fois par jour.",
+      "Encourager l'expectoration par la toux assistée toutes les 4 heures."
+    ],
+    moyen: [
+      "Surveiller les bruits respiratoires et noter tout changement 2 fois/jour.",
+      "Assurer une hydratation suffisante pour fluidifier les sécrétions (1500-2000 ml/j)."
+    ],
+    long: [
+      "Mettre en œuvre un programme d’exercices respiratoires quotidiens.",
+      "Assurer une surveillance continue de la saturation O2 avec alerte si < 92%."
+    ],
+  },
+  "Incapacité de maintenir une respiration spontanée": {
+    court: [
+      "Installer le patient en position semi-Fowler pour faciliter la respiration.",
+      "Vérifier le bon fonctionnement de l'assistance respiratoire toutes les 2 heures."
+    ],
+    moyen: [
+      "Encourager le patient à initier des respirations spontanées assistées (CPAP, etc.).",
+      "Surveiller les paramètres respiratoires (FR, SpO2, signes de fatigue) 3 fois/jour."
+    ],
+    long: [
+      "Planifier un sevrage progressif de l’assistance respiratoire avec évaluation quotidienne.",
+      "Former le patient à reconnaître les signes précoces de détresse respiratoire."
+    ],
+  },
+  "Intolérance au sevrage de la ventilation assistée": {
+    court: [
+      "Débuter le sevrage par sessions de 30 min sous surveillance continue.",
+      "Évaluer la tolérance (FR, SpO2, FC) toutes les 15 minutes pendant le sevrage."
+    ],
+    moyen: [
+      "Augmenter progressivement la durée des périodes sans assistance selon protocole.",
+      "Coordonner avec l’équipe médicale l’ajustement du plan de sevrage quotidiennement."
+    ],
+    long: [
+      "Assurer un soutien psychologique pendant le processus de sevrage.",
+      "Mettre en place un suivi post-sevrage des paramètres respiratoires pendant 48h."
+    ],
+  },
+  "Mode de respiration inefficace": {
+    court: [
+      "Enseigner la respiration diaphragmatique 2 fois/jour avec supervision.",
+      "Mettre en position assise ou semi-assise pour optimiser l’expansion pulmonaire."
+    ],
+    moyen: [
+      "Mettre en œuvre des exercices de contrôle du rythme respiratoire pendant les soins.",
+      "Évaluer les efforts respiratoires et ajuster le plan de soins chaque 8 heures."
+    ],
+    long: [
+      "Encourager l’activité physique douce pour améliorer la capacité respiratoire.",
+      "Assurer le suivi hebdomadaire avec kinésithérapeute respiratoire."
+    ],
+  },
+  "Perturbation des échanges gazeux": {
+    court: [
+      "Administrer l’oxygène selon prescription médicale (débit et mode).",
+      "Surveiller les gaz du sang artériel (GDS) dans les 2 premières heures suivant l'admission."
+    ],
+    moyen: [
+      "Repositionner régulièrement le patient pour améliorer la ventilation/perfusion.",
+      "Effectuer une auscultation pulmonaire systématique matin et soir."
+    ],
+    long: [
+      "Adapter le plan de soins en fonction des résultats des GDS et de la clinique.",
+      "Prévoir une consultation en pneumologie si trouble persistant > 3 jours."
+    ],
+  },
+  "Risque élevé de suffocation (manque d'air)": {
+    court: [
+      "Maintenir le patient en position assise ou semi-assise à 45-90°.",
+      "Surveiller les bruits respiratoires et la saturation toutes les 4 heures."
+    ],
+    moyen: [
+      "Effectuer une aspiration douce si présence de sécrétions excessives.",
+      "Adapter la texture des aliments après évaluation logopédique."
+    ],
+    long: [
+      "Éduquer le patient sur les techniques de respiration contrôlée.",
+      "Assurer une surveillance constante lors des repas pour prévenir la suffocation."
+    ],
+  },
+  "Risque de fausse route (ou risque d'inhalation ou d'aspiration)": {
+    court: [
+      "Installer le patient en position assise à 90° avant chaque repas.",
+      "Surveiller la déglutition du patient lors de chaque prise alimentaire (3 fois/jour)."
+    ],
+    moyen: [
+      "Évaluer les capacités de déglutition avec une échelle validée avant chaque repas principal.",
+      "Collaborer avec l’orthophoniste pour exercices de rééducation (1 séance/jour)."
+    ],
+    long: [
+      "Mettre en place un protocole alimentaire adapté (textures modifiées) avec suivi quotidien.",
+      "Assurer un contrôle des signes d'aspiration (toux, voix humide, fièvre) matin et soir pendant 7 jours."
+    ],
+  },
+  "Risque d'intoxication": {
+    court: [
+      "Informer le patient et la famille des substances toxiques à éviter (1 session éducative dès l'admission).",
+      "Étiqueter clairement tous les produits dangereux dans la chambre du patient."
+    ],
+    moyen: [
+      "Faire une évaluation quotidienne de l’environnement pour identifier les risques de toxicité.",
+      "Mettre en œuvre des précautions standards lors de l'administration de médicaments à risque."
+    ],
+    long: [
+      "Suivre l’absence de symptômes d’intoxication via un bilan clinique journalier jusqu’à la sortie.",
+      "Revoir avec l’équipe éducative un plan de prévention des intoxications avant le retour à domicile."
+    ],
+  },
+
+// --- Besoin 2 : Boire et manger
+
+  // Diagnostic : Allaitement maternel efficace
+  "Allaitement maternel efficace": {
+    court: [
+      "Vérifier la position du nourrisson au sein à chaque tétée (minimum 8 fois/jour).",
+      "Assister la mère lors de 3 premières tétées de la journée pour corriger la prise du sein."
+    ],
+    moyen: [
+      "Observer la succion et la déglutition active au moins 3 fois/jour pendant 10 minutes.",
+      "Encourager un allaitement à la demande en respectant un minimum de 8 tétées/24h."
+    ],
+    long: [
+      "Organiser un suivi hebdomadaire avec une consultante en lactation.",
+      "Remplir un carnet de suivi d'allaitement quotidien (prise, durée, comportement du nourrisson)."
+    ],
+  },
+
+  // Diagnostic : Allaitement maternel inefficace
+  "Allaitement maternel inefficace": {
+    court: [
+      "Corriger la position du nourrisson au sein 3 fois par jour avec aide infirmière.",
+      "Surveiller la succion pendant 15 minutes à chaque tétée (au moins 6 fois/jour)."
+    ],
+    moyen: [
+      "Utiliser un tire-lait après chaque tétée pour stimuler la production lactée.",
+      "Surveiller le poids du nourrisson tous les 2 jours pour évaluer l’efficacité de l’allaitement."
+    ],
+    long: [
+      "Mettre en place un plan personnalisé de relance de la lactation avec consultation hebdomadaire.",
+      "Assurer un soutien émotionnel quotidien à la mère pour éviter l’abandon de l’allaitement."
+    ],
+  },
+
+  // Diagnostic : Allaitement maternel interrompu
+  "Allaitement maternel interrompu": {
+    court: [
+      "Proposer une relactation partielle 2 fois/jour selon tolérance et volonté de la mère.",
+      "Effectuer du peau-à-peau au moins 3 fois/jour pendant 20 minutes."
+    ],
+    moyen: [
+      "Augmenter progressivement la fréquence des tétées de 6 à 8 fois/jour.",
+      "Surveiller les signes d’attachement et de satiété après chaque tétée."
+    ],
+    long: [
+      "Instaurer un programme de relactation avec objectifs hebdomadaires clairs.",
+      "Collaborer avec une consultante en lactation pour un plan personnalisé sur 1 mois."
+    ],
+  },
+
+  // Diagnostic : Déficit de volume liquidien (déshydratation)
+  "Déficit de volume liquidien (déshydratation)": {
+    court: [
+      "Administrer 500 ml de soluté IV ou oral prescrit dans les 4 premières heures.",
+      "Mesurer les entrées/sorties toutes les 4 heures pendant les 24 premières heures."
+    ],
+    moyen: [
+      "Surveiller les signes cliniques (pli cutané, muqueuses) toutes les 6 heures.",
+      "Contrôler les paramètres vitaux (TA, FC) 3 fois par jour."
+    ],
+    long: [
+      "Établir un plan d’hydratation journalier individualisé et évalué tous les matins.",
+      "Éduquer le patient sur les besoins hydriques adaptés à son état de santé."
+    ],
+  },
+
+  // Diagnostic : Déficit nutritionnel
+  "Déficit nutritionnel": {
+    court: [
+      "Introduire une alimentation enrichie à chaque repas dès les 24 premières heures.",
+      "Surveiller l’ingestion alimentaire à chaque repas avec une fiche de suivi (3x/jour)."
+    ],
+    moyen: [
+      "Peser le patient tous les 2 jours à la même heure.",
+      "Évaluer les apports nutritionnels journaliers avec un diététicien 1 fois/jour."
+    ],
+    long: [
+      "Impliquer la famille dans un programme éducatif nutritionnel (1 séance/semaine).",
+      "Mettre en place un plan de nutrition personnalisé évalué hebdomadairement."
+    ],
+  },
+
+  // Diagnostic : Excès de volume liquidien (œdème)
+  "Excès de volume liquidien (œdème)": {
+    court: [
+      "Peser le patient chaque matin à jeun.",
+      "Administrer les diurétiques prescrits et surveiller la diurèse toutes les 6 heures."
+    ],
+    moyen: [
+      "Observer les zones œdémateuses 2 fois/jour (matin et soir).",
+      "Adapter l’alimentation à un régime hyposodé (< 2g sel/jour) avec éducation quotidienne."
+    ],
+    long: [
+      "Surveiller les électrolytes 2 fois/semaine selon protocole.",
+      "Mettre en place un programme d’autosurveillance hydrique à domicile avec pesée quotidienne."
+    ],
+  },
+
+  // Diagnostic : Excès nutritionnel
+  "Excès nutritionnel": {
+    court: [
+      "Informer le patient sur les risques métaboliques liés au surpoids dès le 1er jour.",
+      "Faire compléter un journal alimentaire pendant 3 jours consécutifs."
+    ],
+    moyen: [
+      "Mettre en place un programme alimentaire adapté avec consultation diététique tous les 3 jours.",
+      "Encourager 30 minutes d’activité physique douce/jour si possible."
+    ],
+    long: [
+      "Suivre le poids et l’IMC 1 fois/semaine.",
+      "Intégrer le patient dans un programme éducatif de prévention de la surcharge pondérale."
+    ],
+  },
+
+  // Diagnostic : Incapacité (partielle ou totale) d'avaler
+  "Incapacité (partielle ou totale) d'avaler": {
+    court: [
+      "Adapter les textures selon la prescription (broyée, purée ou liquide épaissi) à chaque repas.",
+      "Surveiller la déglutition et les signes de fausse route à chaque repas."
+    ],
+    moyen: [
+      "Faire appel à un orthophoniste pour rééducation 3 fois/semaine.",
+      "Assister le patient lors des repas au moins 2 fois/jour pour correction de posture."
+    ],
+    long: [
+      "Évaluer l’autonomie alimentaire 1 fois/semaine avec ergothérapeute.",
+      "Former le patient et les aidants aux techniques sécurisées de déglutition."
+    ],
+  },
+
+  // Diagnostic : Incapacité (partielle ou totale) de s'alimenter
+  "Incapacité (partielle ou totale) de s'alimenter": {
+    court: [
+      "Évaluer les préférences alimentaires avec le patient dans les 24 premières heures.",
+      "Assister le patient pendant 3 repas/jour pour favoriser l’autonomie."
+    ],
+    moyen: [
+      "Utiliser des aides techniques adaptées (couverts, assiettes) à chaque repas.",
+      "Encourager la participation active à la prise alimentaire au moins 2 fois/jour."
+    ],
+    long: [
+      "Mettre en place un plan d’adaptation avec ergothérapeute sur 2 semaines.",
+      "Impliquer les aidants dans la continuité du soin nutritionnel à domicile."
+    ],
+  },
+
+  // Diagnostic : Mode d'alimentation inefficace chez le nourrisson
+  "Mode d'alimentation inefficace chez le nourrisson": {
+    court: [
+      "Observer le comportement alimentaire du nourrisson à chaque repas (refus, régurgitations).",
+      "Adapter la méthode (biberon/tétée) en fonction de l’âge et des besoins toutes les 12h."
+    ],
+    moyen: [
+      "Instaurer un rythme de 6 à 8 repas/jour en fonction de la tolérance.",
+      "Surveiller la prise pondérale tous les 2 jours."
+    ],
+    long: [
+      "Évaluer la croissance mensuellement avec le pédiatre.",
+      "Former les parents à l’alimentation adaptée selon les recommandations OMS."
+    ],
+  },
+
+  // Diagnostic : Risque élevé d'aspiration (fausse route)
+  "Risque élevé d'aspiration (fausse route)": {
+    court: [
+      "Placer le patient en position semi-assise (45°) avant et pendant chaque repas.",
+      "Surveiller signes de toux, voix rauque ou étouffement après chaque repas."
+    ],
+    moyen: [
+      "Adapter la texture des aliments selon évaluation logopédique (2x/semaine).",
+      "Assurer une surveillance infirmière renforcée pendant 3 repas/jour."
+    ],
+    long: [
+      "Mettre en place un protocole de prévention des fausses routes validé par l’équipe.",
+      "Informer la famille des risques et techniques de prévention à domicile (1 session/sem)."
+    ],
+  },
+
+  // Diagnostic : Risque élevé de déficit de volume liquidien (déshydratation)
+  "Risque élevé de déficit de volume liquidien (déshydratation)": {
+    court: [
+      "Évaluer les signes cliniques toutes les 4 heures (muqueuses sèches, pli cutané, diurèse).",
+      "Encourager une prise orale de liquides au moins 150 ml/3 heures."
+    ],
+    moyen: [
+      "Surveiller la diurèse toutes les 8 heures (objectif : ≥1 ml/kg/h).",
+      "Adapter les apports hydriques journaliers selon température et pertes associées."
+    ],
+    long: [
+      "Planifier une hydratation continue durant tout le séjour avec fiche de suivi quotidienne.",
+      "Former le patient et la famille aux signes de déshydratation et prévention à domicile."
+    ],
+  },
+
+  // Diagnostic : Risque élevé d'excès nutritionnel
+  "Risque élevé d'excès nutritionnel": {
+    court: [
+      "Distribuer une brochure sur l’alimentation équilibrée dès l’admission.",
+      "Évaluer les habitudes alimentaires avec un questionnaire validé le jour 1."
+    ],
+    moyen: [
+      "Planifier un suivi nutritionnel 2 fois/semaine avec pesée et revue des menus.",
+      "Mettre en place un plan de repas hypocalorique individualisé validé par le diététicien."
+    ],
+    long: [
+      "Encourager un changement durable avec entretiens motivationnels hebdomadaires.",
+      "Suivre le poids et les paramètres métaboliques toutes les 2 semaines."
+    ],
+  },
+
+// --- Besoin 3 : Éliminer (urines, selles, peau)
+
+  "Altération de l'élimination urinaire": {
+    court: [
+      "Mesurer la diurèse toutes les 4 heures (objectif > 0,5 ml/kg/h).",
+      "Surveiller la couleur, la clarté et l’odeur de l’urine à chaque miction."
+    ],
+    moyen: [
+      "Évaluer la douleur à la miction 2 fois/jour à l’aide d’une échelle EVA.",
+      "Vérifier les signes d’infection urinaire chaque matin (brûlures, fièvre)."
+    ],
+    long: [
+      "Instaurer une routine de miction toutes les 3 à 4 heures.",
+      "Éduquer le patient à reconnaître les signes précoces de rétention ou d’infection."
+    ],
+  },
+
+  "Constipation": {
+    court: [
+      "Surveiller la fréquence et la consistance des selles quotidiennement.",
+      "Proposer 2 verres d’eau tiède le matin à jeun et encourager >1.5L/jour d’hydratation."
+    ],
+    moyen: [
+      "Proposer un menu enrichi en fibres (légumes verts, céréales complètes) à chaque repas.",
+      "Encourager une marche douce 20 minutes/jour pour stimuler le transit."
+    ],
+    long: [
+      "Établir un rituel de défécation chaque matin après le petit-déjeuner.",
+      "Informer sur l’utilisation raisonnée des laxatifs et surveiller les effets indésirables 1 fois/semaine."
+    ],
+  },
+
+  "Constipation colique": {
+    court: [
+      "Administrer un laxatif osmotique doux le soir si absence de selles >48h (selon protocole).",
+      "Surveiller la présence de ballonnements, douleurs ou borborygmes toutes les 8 heures."
+    ],
+    moyen: [
+      "Adapter l’alimentation avec 25-30g de fibres/jour et 1,5-2L d’eau.",
+      "Favoriser la position accroupie ou avec repose-pieds à chaque passage aux WC."
+    ],
+    long: [
+      "Réaliser une rééducation du péristaltisme avec un programme de mobilisation quotidienne.",
+      "Réévaluer la fonction intestinale hebdomadairement avec le patient et l’équipe soignante."
+    ],
+  },
+
+  "Diarrhée": {
+    court: [
+      "Surveiller la fréquence et la consistance des selles à chaque passage.",
+      "Administrer un soluté de réhydratation orale toutes les 4 heures si pertes >3 selles/jour."
+    ],
+    moyen: [
+      "Adapter le régime alimentaire avec riz, carottes, banane et yaourt 2 fois/jour.",
+      "Évaluer les signes de déshydratation toutes les 6 heures (pli cutané, soif, diurèse)."
+    ],
+    long: [
+      "Rechercher les causes de la diarrhée avec bilan prescrit (examen coprologique, infection).",
+      "Éduquer sur les précautions alimentaires à long terme pour prévenir les récidives."
+    ],
+  },
+
+  "Incapacité (partielle ou totale) d'utiliser les toilettes": {
+    court: [
+      "Prévoir une aide à la mobilisation pour l’accès aux toilettes toutes les 2 à 3 heures.",
+      "Installer un bassin ou chaise percée adaptée au chevet si mobilité réduite."
+    ],
+    moyen: [
+      "Former l’équipe à l’accompagnement personnalisé aux besoins d’élimination.",
+      "Planifier une réévaluation de l’autonomie toutes les 48 heures."
+    ],
+    long: [
+      "Mettre en place des dispositifs d’accessibilité aux WC (barres, éclairage, sonnette d’appel).",
+      "Intégrer un ergothérapeute pour un plan de réadaptation personnalisé."
+    ],
+  },
+
+  "Incontinence fécale": {
+    court: [
+      "Changer les protections toutes les 4 heures ou dès souillure.",
+      "Laver et sécher soigneusement la région périnéale après chaque épisode."
+    ],
+    moyen: [
+      "Mettre en place une routine de défécation après chaque repas.",
+      "Adapter la texture des aliments pour réguler le transit (fibres solubles)."
+    ],
+    long: [
+      "Proposer une rééducation anale 3 fois/semaine (biofeedback, exercices sphinctériens).",
+      "Former le patient à reconnaître les signes précurseurs de perte de contrôle."
+    ],
+  },
+
+  "Incontinence urinaire à l'effort": {
+    court: [
+      "Enseigner les exercices de Kegel 3 fois/jour (10 contractions à maintenir 5 secondes).",
+      "Demander au patient d’éviter de boire 2 heures avant toute activité physique prévue."
+    ],
+    moyen: [
+      "Programmer des séances de rééducation pelvienne avec kiné 2 fois/semaine.",
+      "Surveiller les épisodes de fuite via un journal mictionnel sur 3 jours consécutifs."
+    ],
+    long: [
+      "Évaluer la progression chaque semaine avec un test d’effort standardisé.",
+      "Mettre en place un programme de renforcement musculaire personnalisé."
+    ],
+  },
+
+  "Incontinence urinaire fonctionnelle": {
+    court: [
+      "Vérifier l’accessibilité aux toilettes toutes les 2 heures pendant la journée.",
+      "Éliminer les obstacles physiques dans la chambre et autour du lit."
+    ],
+    moyen: [
+      "Mettre à disposition un dispositif d’alerte (cloche, sonnette) pour assistance rapide.",
+      "Mettre à disposition un urinal ou bassin près du lit durant la nuit."
+    ],
+    long: [
+      "Adapter l’environnement (siège rehaussé, barres d’appui) selon bilan ergothérapeutique.",
+      "Mettre en place une stratégie de mictions programmées avec participation du patient."
+    ],
+  },
+
+  "Incontinence urinaire par réduction du temps d'alerte": {
+    court: [
+      "Établir un horaire de mictions toutes les 2 heures pendant la journée.",
+      "Utiliser des vêtements faciles à enlever pour réduire le délai d'accès aux toilettes."
+    ],
+    moyen: [
+      "Introduire des techniques de distraction et de renforcement positif en cas de réussite.",
+      "Former l’équipe à repérer les signes précurseurs chez le patient (agitation, posture)."
+    ],
+    long: [
+      "Réévaluer les intervalles de miction tous les 3 jours pour allongement progressif.",
+      "Éduquer le patient et sa famille à l’anticipation des besoins d’élimination."
+    ],
+  },
+
+  "Incontinence urinaire réflexe": {
+    court: [
+      "Mettre des protections absorbantes jour et nuit, à changer toutes les 4 heures.",
+      "Stimuler le réflexe de miction toutes les 3 heures via compression douce ou tapotement sus-pubien."
+    ],
+    moyen: [
+      "Programmer un sondage intermittent toutes les 4 à 6 heures selon protocole médical.",
+      "Surveiller la distension vésicale par palpation abdominale toutes les 8 heures."
+    ],
+    long: [
+      "Mettre en place une fiche de surveillance mictionnelle avec évaluation quotidienne.",
+      "Former l’aidant aux gestes d’aide au sondage ou au drainage si nécessaire."
+    ],
+  },
+
+  "Incontinence urinaire vraie (totale)": {
+    court: [
+      "Assurer une hygiène périnéale au moins 3 fois/jour et après chaque miction.",
+      "Utiliser des protections adaptées (change complet) et les renouveler toutes les 4 heures."
+    ],
+    moyen: [
+      "Évaluer les risques d’escarres à chaque change en utilisant l’échelle de Braden.",
+      "Adapter les soins selon les recommandations du protocole d'incontinence chronique."
+    ],
+    long: [
+      "Mettre en place une prise en charge globale (urologue, hygiéniste, infirmier coordinateur).",
+      "Informer le patient et/ou la famille sur la gestion quotidienne et la prévention des complications."
+    ],
+  },
+
+  "Pseudo-constipation": {
+    court: [
+      "Interroger le patient sur ses habitudes d’élimination à l’admission.",
+      "Tenir un journal des selles quotidien pour vérifier la fréquence réelle."
+    ],
+    moyen: [
+      "Corriger les fausses croyances à l’aide d’un support éducatif illustré.",
+      "Adapter le plan alimentaire à la physiologie du patient sans recourir systématiquement aux laxatifs."
+    ],
+    long: [
+      "Mettre en place un rythme de défécation naturel basé sur les signaux internes.",
+      "Évaluer l’évolution chaque semaine avec l’équipe éducative ou diététicien."
+    ],
+  },
+
+  "Rétention urinaire": {
+    court: [
+      "Surveiller le volume résiduel post-mictionnel par échographie vésicale après chaque miction.",
+      "Palper la vessie toutes les 4 heures si suspicion de globe vésical."
+    ],
+    moyen: [
+      "Effectuer des sondages évacuateurs selon protocole en cas de rétention confirmée.",
+      "Observer les signes d’inconfort ou de douleur à la miction et noter 2 fois/jour."
+    ],
+    long: [
+      "Mettre en place un plan de soins urologiques adapté si rétention chronique.",
+      "Programmer une consultation urodynamique si amélioration insuffisante après 3 jours."
+    ],
+  },
+// --- Besoin 4 : Se mouvoir et maintenir une bonne posture
+
+  "Altération de la mobilité physique": {
+    court: [
+      "Évaluer la capacité de mobilité 1 fois/jour avec l’échelle de Barthel.",
+      "Mobiliser le patient au fauteuil 2 fois/jour avec aide si nécessaire."
+    ],
+    moyen: [
+      "Proposer l’utilisation de canne, déambulateur ou fauteuil selon évaluation kiné.",
+      "Encourager les déplacements accompagnés dans le service au moins 2 fois/jour."
+    ],
+    long: [
+      "Suivre un programme de rééducation fonctionnelle 3 fois/semaine.",
+      "Mettre en place un planning de marche autonome quotidien, avec suivi de progression hebdomadaire."
+    ],
+  },
+
+  "Diminution de l'irrigation tissulaire": {
+    court: [
+      "Surveiller la couleur, température, et pouls périphériques toutes les 4 heures.",
+      "Éviter les vêtements serrés ou les contentions prolongées >2h."
+    ],
+    moyen: [
+      "Mobiliser les membres inférieurs toutes les 2 heures si alité.",
+      "Surélever les jambes 3 fois/jour pendant 20 minutes pour améliorer le retour veineux."
+    ],
+    long: [
+      "Éduquer le patient à l’auto-surveillance des extrémités (coloration, engourdissement).",
+      "Mettre en place une stratégie de prévention des troubles circulatoires avec le médecin."
+    ],
+  },
+
+  "Diminution du débit cardiaque": {
+    court: [
+      "Surveiller les signes de surcharge (œdèmes, dyspnée) 2 fois/jour.",
+      "Mesurer la fréquence cardiaque et la tension artérielle toutes les 6 heures."
+    ],
+    moyen: [
+      "Mettre en place des exercices de respiration profonde 2 fois/jour pour améliorer l’oxygénation.",
+      "Encourager des efforts courts et fractionnés (toilette, marche de 5 min)."
+    ],
+    long: [
+      "Éduquer le patient sur la gestion des efforts (technique de repos, pause, répartition).",
+      "Mettre en place une réadaptation à l’effort progressive avec suivi hebdomadaire."
+    ],
+  },
+
+  "Intolérance à l'activité": {
+    court: [
+      "Surveiller la fréquence cardiaque et SpO2 avant, pendant et après chaque mobilisation.",
+      "Adapter les soins à un rythme lent et par étapes (toilette en 2 phases)."
+    ],
+    moyen: [
+      "Planifier des activités progressives avec pause toutes les 15 min.",
+      "Favoriser la participation aux soins personnels matin et soir avec aide."
+    ],
+    long: [
+      "Proposer un programme de renforcement musculaire doux 3 fois/semaine.",
+      "Revoir l'autonomie globale chaque semaine pour adapter le plan d’effort."
+    ],
+  },
+
+  "Risque élevé de dysfonctionnement neurovasculaire périphérique": {
+    court: [
+      "Évaluer les sensibilités distales (toucher, douleur, température) 3 fois/jour.",
+      "Surveiller les signes de compression (engourdissement, cyanose) toutes les 4 heures."
+    ],
+    moyen: [
+      "Mobiliser les segments concernés toutes les 2 heures en cas d'immobilisation.",
+      "Changer la position du membre à risque toutes les 3 heures."
+    ],
+    long: [
+      "Éduquer le patient à éviter les postures prolongées et à vérifier les extrémités.",
+      "Intégrer un kinésithérapeute pour bilan et exercices ciblés 2 fois/semaine."
+    ],
+  },
+
+  "Risque élevé de syndrome d'immobilité": {
+    court: [
+      "Mobiliser passivement les articulations 2 fois/jour en l'absence de mouvement actif.",
+      "Changer la position toutes les 2 heures jour et nuit (décubitus latéral/ventral/dorsal)."
+    ],
+    moyen: [
+      "Mettre au fauteuil au moins 1 heure matin et 1 heure après-midi.",
+      "Stimuler la participation du patient aux soins personnels chaque jour."
+    ],
+    long: [
+      "Mettre en place un programme personnalisé de mobilisation active avec kinésithérapeute.",
+      "Évaluer mensuellement l’évolution avec échelle d'autonomie (Katz, Barthel)."
+    ],
+  },
+
+  "Risque élevé d'intolérance à l'activité": {
+    court: [
+      "Surveiller les constantes vitales (TA, FC, FR, SpO2) avant et après activité.",
+      "Évaluer l’essoufflement avec échelle de Borg à chaque effort."
+    ],
+    moyen: [
+      "Augmenter progressivement le temps de marche chaque jour selon tolérance.",
+      "Introduire une routine d’activité douce matin et soir (étirements, transfert lit-fauteuil)."
+    ],
+    long: [
+      "Favoriser l’autonomie aux activités quotidiennes en fixant des objectifs concrets.",
+      "Collaborer avec kinésithérapeute pour adapter l’activité à la capacité fonctionnelle hebdomadairement."
+    ],
+  },
+
+// --- Besoin 5 : Dormir et se reposer
+
+  "Fatigue": {
+    court: [
+      "Évaluer la fatigue avec échelle visuelle analogique 2 fois/jour (matin et soir).",
+      "Proposer des pauses de repos de 30 min après chaque activité importante."
+    ],
+    moyen: [
+      "Planifier des temps de repos réguliers : matin, après-midi et après les soins.",
+      "Réduire les stimulations nocturnes (lumière, bruit) dès 21h."
+    ],
+    long: [
+      "Mettre en place une routine personnalisée d'alternance activité-repos avec évaluation hebdomadaire.",
+      "Encourager l'auto-évaluation de la fatigue pour mieux gérer l’effort au quotidien."
+    ],
+  },
+
+  "Perturbation des habitudes de sommeil": {
+    court: [
+      "Identifier les causes possibles de perturbation (bruit, douleur, anxiété) en fin de journée.",
+      "Éviter les boissons excitantes (café, thé) après 16h."
+    ],
+    moyen: [
+      "Mettre en place un rituel du coucher (lecture, musique douce, lumière tamisée) chaque soir.",
+      "Administrer un traitement sédatif si prescrit, 30 min avant le coucher."
+    ],
+    long: [
+      "Évaluer la qualité du sommeil chaque matin avec le patient.",
+      "Proposer un suivi psychologique ou relaxations si troubles persistants > 1 semaine."
+    ],
+  },
+
+// --- Besoin 6 : S'habiller et se dévêtir
+
+  "Incapacité (partielle ou totale) de se vêtir et de soigner son apparence": {
+    court: [
+      "Interroger le patient sur ses préférences vestimentaires chaque matin.",
+      "Préparer les vêtements dans l’ordre d’enfilage pour faciliter l’habillage."
+    ],
+    moyen: [
+      "Utiliser des aides techniques (pinces, vêtements adaptés) chaque jour si besoin.",
+      "Encourager à réaliser au moins 50 % de l’habillage seul pendant 3 jours consécutifs."
+    ],
+    long: [
+      "Mettre en place un programme de rééducation à l’habillage avec l’ergothérapeute 2 fois/semaine.",
+      "Évaluer mensuellement l’autonomie d’habillage avec échelle fonctionnelle (Katz, Barthel)."
+    ],
+  },
+// --- Besoin 7 : Maintenir la température du corps
+
+  "Hyperthermie": {
+    court: [
+      "Surveiller la température corporelle toutes les 4 heures jusqu’à retour à la normale.",
+      "Administrer les antipyrétiques prescrits selon protocole médical (ex. : paracétamol 1g/6h)."
+    ],
+    moyen: [
+      "Proposer une hydratation orale régulière (150 ml/heure) pour prévenir la déshydratation.",
+      "Effectuer des soins de confort : bain tiède, dévêtir légèrement le patient si T°C > 38,5°C."
+    ],
+    long: [
+      "Informer le patient sur les signes précoces de fièvre et les mesures à prendre à domicile.",
+      "Éduquer à l’importance de l’hygiène des mains et de l’environnement pour limiter les infections."
+    ],
+  },
+
+  "Hypothermie": {
+    court: [
+      "Surveiller la température toutes les 2 heures jusqu’à stabilisation.",
+      "Utiliser des couvertures chaudes, bouillottes ou couverture chauffante (selon protocole)."
+    ],
+    moyen: [
+      "Favoriser les boissons chaudes 3 à 4 fois/jour si autorisé.",
+      "Limiter les bains ou soins à l’eau froide durant l’épisode d’hypothermie."
+    ],
+    long: [
+      "Éduquer le patient à se couvrir correctement en cas de froid.",
+      "Adapter la température de la chambre (20–22°C) et les vêtements portés."
+    ],
+  },
+
+  "Risque élevé d'altération de la température corporelle": {
+    court: [
+      "Évaluer la température matin et soir en prévention.",
+      "Informer le patient des risques liés aux changements brusques de température."
+    ],
+    moyen: [
+      "Adapter l’environnement (vêtements, chauffage, ventilation) selon saison et état du patient.",
+      "Favoriser un apport hydrique suffisant (1,5 à 2 L/jour) pour soutenir la thermorégulation."
+    ],
+    long: [
+      "Encourager l’utilisation de protections solaires ou vêtements couvrants en été.",
+      "Prévoir un suivi en soins infirmiers à domicile en cas de fragilité thermique."
+    ],
+  },
+
+  "Thermorégulation inefficace": {
+    court: [
+      "Surveiller la température 3 fois/jour (matin, après-midi, soir).",
+      "Adapter les habits et la literie selon les sensations exprimées par le patient."
+    ],
+    moyen: [
+      "Encourager l’autonomie dans la gestion du confort thermique (fenêtre, couverture...).",
+      "Informer le patient sur les moyens d’auto-régulation thermique simples (hydratation, activité modérée)."
+    ],
+    long: [
+      "Mettre en place une routine d’ajustement de l’environnement en fonction des saisons.",
+      "Assurer un suivi si pathologies affectant la thermorégulation (ex. : diabète, hypothyroïdie)."
+    ],
+  },
+
+// --- Besoin 8 : Être propre, soigné, protéger ses téguments
+
+  "Atteinte à l'intégrité de la muqueuse buccale": {
+    court: [
+      "Effectuer un soin de bouche au moins 3 fois/jour (après repas et avant coucher).",
+      "Surveiller quotidiennement l’état de la muqueuse buccale (lésions, saignement, sécheresse)."
+    ],
+    moyen: [
+      "Utiliser des bains de bouche antiseptiques si prescrits (2 fois/jour).",
+      "Adapter l’alimentation pour éviter les irritants (acides, trop chauds, épicés)."
+    ],
+    long: [
+      "Éduquer le patient sur les soins bucco-dentaires quotidiens (brossage, hydratation).",
+      "Mettre en place une routine de suivi buccal (hebdomadaire si soins palliatifs)."
+    ],
+  },
+
+  "Atteinte à l'intégrité de la peau": {
+    court: [
+      "Surveiller quotidiennement les zones à risque (sacrum, talons, coudes).",
+      "Effectuer une toilette douce avec savon au pH neutre chaque jour."
+    ],
+    moyen: [
+      "Appliquer une crème hydratante sur les zones sèches 2 fois/jour.",
+      "Changer les draps et vêtements souillés immédiatement pour éviter la macération."
+    ],
+    long: [
+      "Informer sur les techniques d’auto-soin de la peau (hydratation, protection solaire, hygiène).",
+      "Mettre en œuvre un programme de prévention des escarres si patient alité (matelas anti-escarres, changement de position toutes les 2h)."
+    ],
+  },
+
+  "Atteinte à l'intégrité des tissus": {
+    court: [
+      "Observer et documenter les plaies à chaque soin (douleur, exsudat, inflammation).",
+      "Nettoyer la plaie selon protocole (NaCl, antiseptique, pansement stérile) 1 à 2 fois/jour."
+    ],
+    moyen: [
+      "Mettre en œuvre les traitements prescrits (pansements spécifiques, antibiotiques).",
+      "Surveiller l’évolution des plaies tous les 2 jours avec l’infirmier référent."
+    ],
+    long: [
+      "Éduquer le patient à la gestion de la plaie à domicile si autonomie suffisante.",
+      "Optimiser la nutrition et l’hydratation pour soutenir la cicatrisation (protéines, zinc, vitamines)."
+    ],
+  },
+
+  "Incapacité (partielle ou totale) de se laver et d'effectuer ses soins d'hygiène": {
+    court: [
+      "Proposer une aide à la toilette chaque matin ou selon demande du patient.",
+      "Préparer le matériel à portée de main pour faciliter les soins autonomes."
+    ],
+    moyen: [
+      "Encourager la participation active à la toilette (visage, mains, parties intimes).",
+      "Former l’aidant familial à l’accompagnement bienveillant aux soins d’hygiène (1 fois/jour)."
+    ],
+    long: [
+      "Élaborer un plan de récupération de l’autonomie avec ergothérapeute.",
+      "Évaluer mensuellement l’évolution de l’autonomie dans les soins corporels."
+    ],
+  },
+
+  "Risque élevé d'atteinte à l'intégrité de la peau": {
+    court: [
+      "Inspecter la peau 2 fois/jour (matin et soir) pour repérer rougeurs, humidité, lésions.",
+      "Utiliser des protections cutanées adaptées en cas d’incontinence ou de transpiration excessive."
+    ],
+    moyen: [
+      "Mettre en œuvre un plan de changement de position toutes les 2 heures en position allongée.",
+      "Hydrater la peau 2 fois/jour pour éviter la sécheresse et la fragilité."
+    ],
+    long: [
+      "Éduquer le patient et ses proches sur les mesures de prévention des escarres.",
+      "Installer un matelas anti-escarres ou coussins de positionnement si alitement prolongé."
+    ],
+  },
+// --- Besoin 9 : Éviter les dangers
+
+  "Altération des mécanismes de protection": {
+    court: [
+      "Évaluer les risques de l’environnement lors de chaque tournée infirmière (2 fois/jour).",
+      "Informer le patient des gestes sécuritaires de base lors des déplacements."
+    ],
+    moyen: [
+      "Encourager le port de chaussures antidérapantes et adaptées en permanence.",
+      "Mettre en place un éclairage suffisant dans les zones de passage du patient."
+    ],
+    long: [
+      "Former le patient aux mesures de prévention des chutes et blessures 1 fois/semaine.",
+      "Réévaluer mensuellement les habitudes sécuritaires du patient à domicile ou en institution."
+    ],
+  },
+
+  "Anxiété modérée": {
+    court: [
+      "Proposer des séances de respiration profonde 3 fois/jour en période de stress.",
+      "Créer un climat rassurant par une écoute active à chaque interaction."
+    ],
+    moyen: [
+      "Mettre en place un rituel de relaxation (musique douce, massage) chaque soir.",
+      "Orienter le patient vers un soutien psychologique si besoin (1 consultation/semaine)."
+    ],
+    long: [
+      "Accompagner le patient dans l’identification des pensées anxiogènes et leur restructuration.",
+      "Encourager des activités apaisantes régulières (lecture, jardinage, méditation)."
+    ],
+  },
+
+  "Douleur aiguë": {
+    court: [
+      "Évaluer la douleur avec une échelle visuelle analogique à chaque prise de constantes.",
+      "Administrer l’analgésique prescrit dans les 30 minutes suivant l’évaluation si EVA > 3."
+    ],
+    moyen: [
+      "Observer la réaction du patient au traitement dans l’heure suivant l’administration.",
+      "Appliquer des techniques non pharmacologiques (glace, chaleur, repositionnement) 2 fois/jour."
+    ],
+    long: [
+      "Adapter le protocole antalgique en concertation avec l’équipe médicale chaque jour.",
+      "Informer le patient sur la gestion de la douleur à domicile avant la sortie."
+    ],
+  },
+
+  "Confusion aiguë": {
+    court: [
+      "Réorienter verbalement le patient à chaque interaction (nom, lieu, date).",
+      "Limiter les stimulations sonores et lumineuses excessives dans la chambre."
+    ],
+    moyen: [
+      "Utiliser des objets familiers (photos, montre, calendrier) comme repères visibles.",
+      "Surveiller les constantes et signes neurologiques toutes les 4 heures."
+    ],
+    long: [
+      "Encourager la participation du patient aux soins simples quotidiens pour stimuler l’ancrage.",
+      "Mettre en place un suivi neuropsychologique si la confusion persiste plus de 3 jours."
+    ],
+  },
+
+  "Risque élevé d'accident": {
+    court: [
+      "Installer les barrières de lit en position haute sauf contre-indication.",
+      "Surveiller les déplacements du patient fragilisé toutes les 2 heures."
+    ],
+    moyen: [
+      "Mettre à disposition un système d’appel facilement accessible.",
+      "Ajuster l’environnement (fils électriques, tapis glissants) pour prévenir les chutes."
+    ],
+    long: [
+      "Éduquer le patient et la famille aux mesures de prévention des chutes à domicile.",
+      "Réévaluer le risque d’accident chaque semaine avec l’équipe pluridisciplinaire."
+    ],
+  },
+
+  "Non-observance": {
+    court: [
+      "Identifier avec le patient les freins à l’adhésion au traitement (croyances, effets indésirables...).",
+      "Observer les prises de traitement pendant 24 heures pour évaluer l’adhérence."
+    ],
+    moyen: [
+      "Expliquer les bénéfices/risques du traitement à l’aide d’un support visuel adapté.",
+      "Établir une routine thérapeutique accompagnée pendant 3 jours minimum."
+    ],
+    long: [
+      "Mettre en place un pilulier ou une alarme journalière pour améliorer l’observance.",
+      "Programmer un suivi infirmier hebdomadaire après la sortie pour évaluer l’adhésion."
+    ],
+  },
+
+  "Risque élevé d'infection": {
+    court: [
+      "Réaliser une hygiène des mains avant et après chaque soin.",
+      "Changer les pansements souillés ou humides immédiatement (au minimum 1 fois/jour)."
+    ],
+    moyen: [
+      "Surveiller la température corporelle 2 fois/jour et les signes locaux d’infection.",
+      "Utiliser une technique stérile pour tout soin invasif selon protocole."
+    ],
+    long: [
+      "Informer le patient sur l’hygiène personnelle, de l’environnement et du matériel.",
+      "Planifier un suivi post-hospitalisation en lien avec le médecin traitant ou IDE libéral."
+    ],
+  },
+// --- Besoin 10 : Communiquer avec ses semblables
+"Altération de la communication verbale": {
+  court: [
+    "Observer et encourager l'utilisation de gestes, mimiques ou sons au moins 3 fois/jour.",
+    "Mettre à disposition un carnet ou tableau de communication simplifiée."
+  ],
+  moyen: [
+    "Stimuler la verbalisation à l’aide de questions ouvertes 2 fois/jour.",
+    "Encourager la formulation de phrases simples avec soutien visuel si besoin."
+  ],
+  long: [
+    "Mettre en place des séances régulières avec un orthophoniste (2 à 3 fois/semaine).",
+    "Assurer un suivi hebdomadaire des progrès de communication avec l’équipe."
+  ],
+},
+
+"Altération de la perception sensorielle": {
+  court: [
+    "Évaluer les troubles sensoriels à l’aide d’un test auditif/visuel lors de l’admission.",
+    "Informer le patient sur les aides disponibles (lunettes, prothèse auditive...)."
+  ],
+  moyen: [
+    "Assurer l'utilisation correcte des dispositifs correcteurs (minimum 2 vérifications/jour).",
+    "Adapter l’environnement (éclairage, volume sonore) selon le déficit sensoriel."
+  ],
+  long: [
+    "Proposer une évaluation spécialisée (ORL, ophtalmo) si les troubles persistent.",
+    "Éduquer le patient et l’entourage sur l’adaptation sensorielle au quotidien."
+  ],
+},
+
+"Dysfonctionnement sexuel": {
+  court: [
+    "Créer un espace de parole sécurisé pour exprimer les inquiétudes.",
+    "Noter l’impact du traitement ou pathologie sur la fonction sexuelle."
+  ],
+  moyen: [
+    "Orienter vers un professionnel compétent (psychologue, sexologue).",
+    "Proposer des supports d'information adaptés sur la sexualité en contexte de maladie."
+  ],
+  long: [
+    "Favoriser une communication ouverte avec le partenaire si existant.",
+    "Mettre en place un suivi régulier pour ajuster le plan de soins au vécu sexuel."
+  ],
+},
+
+"Isolement social": {
+  court: [
+    "Évaluer le réseau social du patient dès l’admission.",
+    "Encourager un contact avec un proche ou intervenant au moins 1 fois/jour."
+  ],
+  moyen: [
+    "Proposer la participation à des activités collectives 2 à 3 fois/semaine.",
+    "Favoriser les appels ou visio avec les proches chaque jour."
+  ],
+  long: [
+    "Accompagner l’intégration dans un réseau de soutien social durable.",
+    "Évaluer mensuellement la qualité de la vie sociale et relationnelle du patient."
+  ],
+},
+
+"Perturbation des interactions sociales": {
+  court: [
+    "Observer le comportement relationnel dans différents contextes (repas, soins).",
+    "Établir une alliance thérapeutique pour favoriser l’expression des difficultés."
+  ],
+  moyen: [
+    "Proposer un groupe de parole ou une activité interactive chaque semaine.",
+    "Favoriser l'estime de soi à travers la valorisation des interactions positives."
+  ],
+  long: [
+    "Mettre en place un suivi psychologique individualisé sur le long terme.",
+    "Évaluer la stabilité relationnelle et les acquis sociaux tous les mois."
+  ],
+},
+
+"Syndrome du traumatisme de viol": {
+  court: [
+    "Assurer un accompagnement empathique et confidentiel dès l’admission.",
+    "Observer les signes de détresse ou évitement en situation sociale ou intime."
+  ],
+  moyen: [
+    "Proposer un suivi psychothérapeutique spécialisé (minimum 1 séance/semaine).",
+    "Éduquer sur les mécanismes post-traumatiques pour favoriser la résilience."
+  ],
+  long: [
+    "Soutenir le développement de relations saines et sécurisantes.",
+    "Mettre en place un plan de suivi continu post-hospitalisation si besoin."
+  ],
+},
+
+// --- Besoin 11 : Agir selon ses croyances et ses valeurs
+"Bien-être spirituel : actualisation potentielle": {
+  court: [
+    "Interroger le patient sur ses pratiques spirituelles ou croyances au moment des soins.",
+    "Mettre à disposition des ressources spirituelles (livres, objets, visites religieuses)."
+  ],
+  moyen: [
+    "Faciliter la participation à des rituels religieux ou moments de méditation 2 fois/semaine.",
+    "Proposer des temps d’échange personnalisés avec un référent spirituel."
+  ],
+  long: [
+    "Évaluer avec le patient l’impact des pratiques spirituelles sur son bien-être global.",
+    "Maintenir un environnement respectueux des valeurs personnelles du patient."
+  ],
+},
+
+"Détresse spirituelle": {
+  court: [
+    "Permettre au patient de verbaliser son mal-être existentiel au calme.",
+    "Repérer les expressions de culpabilité, perte de sens, ou colère contre la vie/dieu."
+  ],
+  moyen: [
+    "Proposer un accompagnement spirituel ou psychologique adapté 1 à 2 fois/semaine.",
+    "Utiliser des techniques de relaxation ou de méditation guidée."
+  ],
+  long: [
+    "Favoriser la reconstruction de sens à travers les soins, les relations et les projets.",
+    "Évaluer régulièrement le niveau de détresse et l’évolution du ressenti du patient."
+  ],
+},
+
+"Perte d'espoir": {
+  court: [
+    "Explorer avec le patient ses pensées négatives et ses sources d’espoir.",
+    "Souligner les forces et ressources personnelles lors des soins quotidiens."
+  ],
+  moyen: [
+    "Définir avec le patient un objectif à court terme atteignable chaque semaine.",
+    "Mettre en lien avec un pair aidant ou groupe de soutien si disponible."
+  ],
+  long: [
+    "Construire un projet de vie cohérent avec ses capacités actuelles.",
+    "Renforcer les stratégies d’adaptation positives à travers un accompagnement global."
+  ],
+},
+
+"Sentiment d'impuissance": {
+  court: [
+    "Identifier les situations où le patient ressent un manque de contrôle.",
+    "Encourager l’expression des besoins et attentes lors des soins."
+  ],
+  moyen: [
+    "Impliquer le patient dans les décisions concernant sa prise en charge chaque jour.",
+    "Utiliser des outils visuels ou écrits pour l’aider à planifier ses choix."
+  ],
+  long: [
+    "Favoriser l’autonomie décisionnelle à travers la co-construction du projet de soins.",
+    "Évaluer mensuellement l’évolution du sentiment de compétence et de maîtrise."
+  ],
+},
+// --- Besoin 12 : S’occuper en vue de se réaliser
+"Conflit décisionnel": {
+  court: [
+    "Encourager l’expression des dilemmes lors d’un entretien structuré (1 fois/jour).",
+    "Fournir un tableau comparatif des options avec avantages/inconvénients."
+  ],
+  moyen: [
+    "Accompagner la réflexion à l’aide d’un outil d’aide à la décision (fiche, schéma, aide soignant).",
+    "Proposer un échange avec un professionnel neutre (psychologue, assistant social)."
+  ],
+  long: [
+    "Favoriser la prise de décision autonome en lien avec les valeurs du patient.",
+    "Réévaluer les décisions prises pour ajuster au besoin."
+  ],
+},
+
+"Difficulté dans l'exercice du rôle d’aidant naturel": {
+  court: [
+    "Écouter les plaintes ou signes d’épuisement de l’aidant (minimum 1 fois/jour).",
+    "Observer les comportements d’alerte (retrait, irritabilité, surcharge)."
+  ],
+  moyen: [
+    "Proposer des moments de répit en planifiant un relais de soin.",
+    "Informer l’aidant sur les aides existantes (associations, services sociaux)."
+  ],
+  long: [
+    "Mettre en place un programme d’accompagnement de l’aidant naturel sur plusieurs semaines.",
+    "Favoriser l’équilibre entre responsabilités et temps personnel."
+  ],
+},
+
+"Incapacité d'organiser le domicile": {
+  court: [
+    "Évaluer avec le patient les obstacles rencontrés dans la gestion quotidienne.",
+    "Lister ensemble les tâches essentielles à réaliser chaque jour."
+  ],
+  moyen: [
+    "Mettre en place un planning visuel et simplifié (planning mural, application mobile).",
+    "Faire intervenir un ergothérapeute si besoin pour optimiser l’espace."
+  ],
+  long: [
+    "Accompagner la mise en œuvre d’une organisation durable à domicile.",
+    "Suivre l’autonomie du patient dans la gestion de son environnement domestique."
+  ],
+},
+
+"Perturbation de la dynamique familiale": {
+  court: [
+    "Recueillir la perception du patient sur ses relations familiales.",
+    "Observer les interactions lors de visites ou appels familiaux."
+  ],
+  moyen: [
+    "Organiser une médiation avec l’équipe ou psychologue familial.",
+    "Favoriser les moments d’échange structurés entre membres de la famille."
+  ],
+  long: [
+    "Mettre en place un projet de soutien familial personnalisé.",
+    "Évaluer mensuellement l’amélioration du climat relationnel."
+  ],
+},
+
+"Syndrome de déracinement": {
+  court: [
+    "Permettre au patient d’exprimer ses sentiments liés au changement (question ouverte, écoute active).",
+    "Favoriser l’affichage d’objets personnels ou photos dans l’espace de vie."
+  ],
+  moyen: [
+    "Mettre en place des activités rappelant l’environnement d’origine (musique, langue, coutumes).",
+    "Encourager la création de nouvelles relations dans le lieu d’accueil."
+  ],
+  long: [
+    "Faciliter l’intégration progressive à travers un accompagnement psychosocial.",
+    "Évaluer mensuellement le sentiment d’appartenance et de sécurité."
+  ],
+},
+
+"Troubles de la mémoire": {
+  court: [
+    "Introduire un carnet de suivi ou pense-bête journalier.",
+    "Stimuler la mémoire immédiate par des jeux simples 1 fois/jour."
+  ],
+  moyen: [
+    "Mettre en place un rituel quotidien pour structurer les repères temporels.",
+    "Associer l'entourage dans la répétition d’informations importantes."
+  ],
+  long: [
+    "Suivre les performances mnésiques avec un professionnel (neuropsychologue ou ergothérapeute).",
+    "Adapter les tâches quotidiennes pour favoriser l’autonomie partielle."
+  ],
+},
+
+// --- Besoin 13 : Se recréer (se divertir)
+"Manque de loisirs": {
+  court: [
+    "Interroger le patient sur ses centres d’intérêt ou anciens loisirs.",
+    "Proposer 1 activité adaptée à son état chaque jour (lecture, jeux, musique...)."
+  ],
+  moyen: [
+    "Intégrer le patient dans une activité de groupe au moins 2 fois/semaine.",
+    "Planifier un moment de loisir personnalisé dans le programme de soins."
+  ],
+  long: [
+    "Évaluer la satisfaction du patient vis-à-vis des activités récréatives mensuellement.",
+    "Encourager la reprise d’un loisir régulier même après la sortie."
+  ],
+},
+
+// --- Besoin 14 : Apprendre
+"Manque de connaissances": {
+  court: [
+    "Demander au patient ce qu’il sait de sa maladie ou traitement.",
+    "Utiliser un support visuel ou schématique pour les explications (1 fois/jour selon capacité)."
+  ],
+  moyen: [
+    "Réaliser une session éducative ciblée (30 min) sur un thème choisi avec le patient.",
+    "Réévaluer la compréhension à travers des questions ou reformulations."
+  ],
+  long: [
+    "Mettre en place un programme d’éducation thérapeutique structuré sur plusieurs jours.",
+    "Impliquer le patient dans des décisions basées sur ses nouvelles connaissances."
+  ],
+},
+};
+    const table = document.getElementById('planificationTable');
+
+diagnostics.forEach(diagnostic => {
+  const obj = objectifs[diagnostic];
+  const id = diagnostic.replace(/\s+/g, '_');
+  const intervs = interventionsPredefinies[diagnostic] || {};
+
+  const rows = [
+    { type: 'court', tableId: 'tableCourt', objectif: obj.court, interventions: intervs.court || [] },
+    { type: 'moyen', tableId: 'tableMoyen', objectif: obj.moyen, interventions: intervs.moyen || [] },
+    { type: 'long', tableId: 'tableLong', objectif: obj.long, interventions: intervs.long || [] }
+  ];
+
+  rows.forEach(row => {
+    const textareaId = `${id}_${row.type}_interventions`;
+    const interventionsText = row.interventions.map(i => `- ${i}`).join('\n');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${diagnostic}</strong></td>
+      <td>${row.objectif}</td>
+      <td><textarea id="${textareaId}">${interventionsText}</textarea></td>
+      <td>
+        <button class="btn-save" onclick="saveIntervention('${textareaId}')">✅</button>
+        <div class="saved-by" id="${textareaId}_saved"></div>
+      </td>`;
+    document.getElementById(row.tableId).appendChild(tr);
+  });
+});
+
+const interventionsSaved = JSON.parse(localStorage.getItem('interventionsSaved') || '{}');
+
+Object.keys(interventionsSaved).forEach(id => {
+  const savedEl = document.getElementById(`${id}_saved`);
+  if (savedEl) {
+    savedEl.textContent = `✔ Enregistré par : ${interventionsSaved[id]}`;
+  }
+});
+
+function saveIntervention(id) {
+  const savedEl = document.getElementById(`${id}_saved`);
+  const interventionsSaved = JSON.parse(localStorage.getItem('interventionsSaved') || '{}');
+
+  interventionsSaved[id] = username; // نحفظ اسم المستخدم الذي صادق
+  localStorage.setItem('interventionsSaved', JSON.stringify(interventionsSaved));
+
+  savedEl.textContent = `✔ Enregistré par : ${username}`;
+}
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+    function logout() {
+      localStorage.removeItem('username');
+      window.location.href = 'login.html';
+    }
+
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    patients.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = `${p.prenom} ${p.nom}`;
+      document.getElementById('patient-list').appendChild(li);
+    });
+
+function goBack() {
+  window.location.href = 'objectifs.html'; // عدّل حسب اسم الصفحة السابقة
+}
+
+function goNext() {
+  const interventionsSaved = JSON.parse(localStorage.getItem('interventionsSaved') || '{}');
+  const username = localStorage.getItem('username');
+
+  const interventions = [];
+
+  Object.keys(interventionsSaved).forEach(id => {
+    const textarea = document.getElementById(`${id}_interventions`);
+    if (textarea) {
+      const diagnostic = id.replace(/_/g, ' ');
+      interventions.push({
+        nom: textarea.value.trim(),
+        diagnostic: diagnostic,
+        utilisateur: username
+      });
+    }
+  });
+
+  localStorage.setItem('interventionsValidees', JSON.stringify(interventions));
+
+  window.location.href = 'execution.html';
+}
+
+  </script>
+</body>
+</html>
+ 
